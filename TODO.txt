@@ -1,0 +1,21 @@
+Objectif v0.1 : 
+-Création guide utilisateur
+
+TODO :
+
+-Changer texte capture pour avancer point par point et à chaque point on a une chance d'échouer ou de continuer jusqu'au succès
+-Ajouter gain d'xp sur capture
+-Ajouter bonus capture rate en fonction du lvl du dresseur
+-Tous les jours on peut tenter de capturer un Pokémon
+    -Daily reset
+-Check que deux utilisateurs ne peuvent pas s'embrouiller sur les msg
+-Créer zones où les dresseurs peuvent se déplacer (pkm 1 à 20 dispo par exemple, shop différents...)
+-Ajout field "DailyCaptureDone"/Hourly maybe ?
+-Ajout field "DailyGame"/Hourly maybe ?
+
+Feature :
+
+-Ajout commande leaderboard pour voir le classement des joueurs
+
+Bug : 
+Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête.

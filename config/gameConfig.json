@@ -1,0 +1,39 @@
+{
+  "balls": {
+    "pokeball": {
+      "rate": 1,
+      "price": 10,
+      "feesMultiplier": 1
+    },
+    "superball": {
+      "rate": 1.5,
+      "price": 15,
+      "feesMultiplier": 1
+    },
+    "hyperball": {
+      "rate": 2,
+      "price": 20,
+      "feesMultiplier": 1
+    }
+  },
+  "economy": {
+    "workReward": 100,
+    "gameCooldownHours": 24
+  },
+  "game": {
+    "numberOfPokemon": 151,
+    "guessMyTypeTimeMs": 15000,
+    "guessMyTypeMaxAttempts": 3,
+    "guessMyTypeRewardSingle": 100,
+    "guessMyNameReward": 50
+  },
+  "spawn": {
+    "minIntervalMinutes": 3,
+    "maxIntervalMinutes": 10,
+    "pokemonRarity": {
+      "common": 0.7,
+      "rare": 0.25,
+      "legendary": 0.05
+    }
+  }
+}

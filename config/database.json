@@ -1,0 +1,6 @@
+{
+  "databaseName": "botedex",
+  "collections": {
+    "dresseurs": "dresseurs"
+  }
+}

@@ -1,0 +1,112 @@
+/**
+ * Service de gestion des spawns de Pokémon
+ * Responsabilité : faire apparaître des Pokémon aléatoires dans le channel
+ * principal du bot, à intervalles réguliers tirés dans la plage configurée
+ * (spawn.minIntervalMinutes / maxIntervalMinutes de gameConfig.json).
+ * Le numéro du Pokémon actif est exposé via setNumPkmAvailable() dans
+ * core/client.js pour que CaptureService sache qui est capturable.
+ *
+ * Exemple d'utilisation :
+ *   import { spawnService } from './services/game/SpawnService.js';
+ *   spawnService.startSpawn();
+ */
+
+import { getConfig } from '../../utils/configLoader.js';
+import { channelService } from '../channel/ChannelService.js';
+import { sendGif } from '../../utils/gif.js';
+import { parsingPkm } from '../../utils/parsing.js';
+import { setNumPkmAvailable } from '../../core/client.js';
+import { PhrasesAleatoires } from '../../utils/phrasesAleatoires.js';
+
+export class SpawnService {
+    constructor() {
+        this.config = getConfig();
+        this.spawnInterval = null;
+        // Pools de phrases pour varier les annonces de spawn
+        this.annoncesSpawn = new PhrasesAleatoires([
+            "Un pokémon apparaît ! Il s'agit de {nomPoke} [{numPkm}] !",
+            "Un {nomPoke} [{numPkm}] sauvage surgit des hautes herbes !",
+            "Alerte : un {nomPoke} [{numPkm}] rôde dans le coin...",
+            "Un {nomPoke} [{numPkm}] débarque sans prévenir, montrez-lui de quel Fanta vous vous chauffez !",
+            "Tremblez, mortels : {nomPoke} [{numPkm}] vient d'apparaître !"
+        ]);
+        this.appelsCapture = new PhrasesAleatoires([
+            "Lancez !capture pour tenter de le seques... de le capturer !",
+            "Tapez !capture avant qu'il ne décamp...",
+            "Un petit !capture, ça vous tente ? Il ne se capturera pas tout seul.",
+            "!capture maintenant, ou pleurez plus tard."
+        ]);
+    }
+
+    /**
+     * Démarre le spawn automatique de Pokémon
+     * Un premier spawn immédiat, puis un spawn toutes les X minutes
+     * (X tiré aléatoirement une bonne fois au démarrage)
+     * @returns {void}
+     */
+    startSpawn() {
+        if (this.spawnInterval) {
+            this.stopSpawn();
+        }
+
+        const minMinutes = this.config.spawn.minIntervalMinutes;
+        const maxMinutes = this.config.spawn.maxIntervalMinutes;
+        const randomDelay = this.getRandomDelay(minMinutes, maxMinutes);
+
+        console.log(`[SPAWN] Démarrage des spawns (toutes les ${randomDelay} minutes)`);
+
+        // Premier spawn immédiat
+        this.spawnPokemon();
+
+        // Puis spawns réguliers
+        this.spawnInterval = setInterval(() => {
+            this.spawnPokemon();
+        }, randomDelay * 60 * 1000); // Convertit les minutes en millisecondes
+    }
+
+    /**
+     * Arrête le spawn automatique
+     */
+    stopSpawn() {
+        if (this.spawnInterval) {
+            clearInterval(this.spawnInterval);
+            this.spawnInterval = null;
+            console.log('[SPAWN] Arrêt des spawns');
+        }
+    }
+
+    /**
+     * Fait apparaître un Pokémon aléatoire dans le channel principal
+     * Tire un numéro entre 1 et game.numberOfPokemon, l'expose comme spawn
+     * actif et annonce le Pokémon (phrase piochée au hasard + GIF)
+     * @returns {Promise<void>}
+     */
+    async spawnPokemon() {
+
+        const randomNumPkm = Math.floor(Math.random() * this.config.game.numberOfPokemon) + 1;
+        const arrayParsingPkm = parsingPkm(randomNumPkm);
+        const nomPoke = arrayParsingPkm[0];
+        const captureRate = arrayParsingPkm[1];
+        console.log("[SPAWN] NOM : " + nomPoke + " avec un taux de capture de " + captureRate);
+        setNumPkmAvailable(randomNumPkm);
+        channelService.sendMessage(this.annoncesSpawn.piocher({ nomPoke, numPkm: randomNumPkm }))
+
+        //utilisation de @pokemon pour cibler des stickers generes par le compte officiel de Pokemon sur Giphy
+        await sendGif(nomPoke + " @pokemon");
+        // TODO: Intégrer avec la logique de capture
+        // Exemple: Demander si un utilisateur veut capturer le Pokémon
+        channelService.sendMessage(this.appelsCapture.piocher());
+    }
+
+    /**
+     * Génère un délai aléatoire entre min et max minutes
+     * @param {number} min - Minutes minimum
+     * @param {number} max - Minutes maximum
+     * @returns {number} - Délai en minutes
+     */
+    getRandomDelay(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+}
+
+export const spawnService = new SpawnService();
