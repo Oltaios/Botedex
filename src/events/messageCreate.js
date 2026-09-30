@@ -57,7 +57,13 @@ export async function handle(message) {
             await channelService.replySafe(message, "User already exists tu me prends pour un artichaut ?");
         } else {
             await channelService.replySafe(message, "Wanna create an account, if you used ctrl-c + ctrl-v to enter the command u'll find Magikarp only");
-            await bddService.createNewUser(message.author.id, message.author.username);
+            try {
+                await bddService.createNewUser(message.author.id, message.author.username);
+                await channelService.replySafe(message, `Compte créé ! Tu peux accéder aux différentes commandes via **!help**`);
+            } catch (error) {
+                console.error('❌ Erreur lors de la création de l\'utilisateur:', error);
+                await channelService.replySafe(message, "Une erreur est survenue lors de la création de ton compte. Merci d'embêter votre admin.");
+            }
         }
         return;
     }

@@ -267,7 +267,7 @@ export class BDDService {
         const row = {
             _id: idUser,
             name: username,
-            argent: 0,
+            argent: 500,
             nbrCapture: 0,
             captureAvailable: 1,
             gameAvailable: 1,

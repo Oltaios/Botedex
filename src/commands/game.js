@@ -48,8 +48,9 @@ export async function execute(message) {
 
         await message.reply(
             `🎮 Un dresseur étrange surgit et envoie un ${pkm2Guess.nom}, il te met au défi de trouver son ou ses types ! ` +
-            `Tu as ${gameConfig.guessMyTypeMaxAttempts} essais. ` +
-            `(Possible types : normal/fire/water/electric/grass/ice/fighting/poison/ground/flying/psychic/bug/rock/ghost/dragon/dark/steel/fairy) Exemple d'une réponse : !normal ou !normal/rock (l'ordre en cas de double type n'est pas important)`
+            `\nTu as ${gameConfig.guessMyTypeMaxAttempts} essais.` +
+            `\n(Possible types : normal/fire/water/electric/grass/ice/fighting/poison/ground/flying/psychic/bug/rock/ghost/dragon/dark/steel/fairy)` +
+            `\nExemple d'une réponse : **!normal** ou **!normal/rock** (l'ordre en cas de double type n'est pas important)`
         );
 
         const responseKey = `${message.channel.id}:${message.author.id}`;

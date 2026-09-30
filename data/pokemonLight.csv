@@ -35,8 +35,8 @@ abilities,against_bug,against_dark,against_dragon,against_electric,against_fairy
 "['Poison Point', 'Rivalry', 'Sheer Force']",0.5,1,1,0,0.5,0.5,1,1,1,1,2,2,1,0.25,2,0.5,1,2,102,5120,70,505,45,Drill Pokémon,77,1059860,1.4,81,Nidokingニドキング,Nidoking,100,34,85,75,85,poison,ground,62.0,1,0
 "['Cute Charm', 'Magic Guard', 'Friend Guard']",0.5,0.5,0,1,1,0.5,1,1,1,1,1,1,1,2,1,1,2,1,45,2560,140,323,150,Fairy Pokémon,48,800000,0.6,70,Pippiピッピ,Clefairy,24.6,35,60,65,35,fairy,,7.5,1,0
 "['Cute Charm', 'Magic Guard', 'Unaware']",0.5,0.5,0,1,1,0.5,1,1,1,1,1,1,1,2,1,1,2,1,70,2560,140,483,25,Fairy Pokémon,73,800000,1.3,95,Pixyピクシー,Clefable,24.6,36,95,90,60,fairy,,40.0,1,0
-"['Flash Fire', 'Drought', 'Snow Cloak', 'Snow Warning']",0.5,1,1,1,0.5,1,0.5,1,1,0.5,2,0.5,1,1,1,2,0.5,2,41,5120,70,299,190,Fox Pokémon,40,1000000,,38,Rokonロコン,Vulpix,24.6,37,50,65,65,fire,ice,,1,0
-"['Flash Fire', 'Drought', 'Snow Cloak', 'Snow Warning']",0.5,1,1,1,0.5,1,0.5,1,1,0.5,2,0.5,1,1,1,2,0.5,2,67,5120,70,505,75,Fox Pokémon,75,1000000,,73,Kyukonキュウコン,Ninetales,24.6,38,81,100,109,fire,ice,,1,0
+"['Flash Fire', 'Drought', 'Snow Cloak', 'Snow Warning']",0.5,1,1,1,0.5,1,0.5,1,1,0.5,2,0.5,1,1,1,2,0.5,2,41,5120,70,299,190,Fox Pokémon,40,1000000,,38,Rokonロコン,Vulpix,24.6,37,50,65,65,fire,,,1,0
+"['Flash Fire', 'Drought', 'Snow Cloak', 'Snow Warning']",0.5,1,1,1,0.5,1,0.5,1,1,0.5,2,0.5,1,1,1,2,0.5,2,67,5120,70,505,75,Fox Pokémon,75,1000000,,73,Kyukonキュウコン,Ninetales,24.6,38,81,100,109,fire,,,1,0
 "['Cute Charm', 'Competitive', 'Friend Guard']",0.5,0.5,0,1,1,1,1,1,0,1,1,1,1,2,1,1,2,1,45,2560,70,270,170,Balloon Pokémon,20,800000,0.5,115,Purinプリン,Jigglypuff,24.6,39,45,25,20,normal,fairy,5.5,1,0
 "['Cute Charm', 'Competitive', 'Frisk']",0.5,0.5,0,1,1,1,1,1,0,1,1,1,1,2,1,1,2,1,70,2560,70,435,50,Balloon Pokémon,45,800000,1.0,140,Pukurinプクリン,Wigglytuff,24.6,40,85,50,45,normal,fairy,12.0,1,0
 "['Inner Focus', 'Infiltrator']",0.25,1,1,2,0.5,0.25,1,1,1,0.25,0,2,1,0.5,2,2,1,1,45,3840,70,245,255,Bat Pokémon,35,1000000,0.8,40,Zubatズバット,Zubat,50,41,30,40,55,poison,flying,7.5,1,0

@@ -31,10 +31,10 @@ export class SpawnService {
             "Tremblez, mortels : {nomPoke} [{numPkm}] vient d'apparaître !"
         ]);
         this.appelsCapture = new PhrasesAleatoires([
-            "Lancez !capture pour tenter de le seques... de le capturer !",
-            "Tapez !capture avant qu'il ne décamp...",
-            "Un petit !capture, ça vous tente ? Il ne se capturera pas tout seul.",
-            "!capture maintenant, ou pleurez plus tard."
+            `Lancez **!capture** pour tenter de le seques... de le capturer !`,
+            `Tapez **!capture** avant qu'il ne décampe !`,
+            `Un petit **!capture**, ça vous tente ? Il ne se capturera pas tout seul.`,
+            `**!capture** maintenant, ou pleurez plus tard.`
         ]);
     }
 

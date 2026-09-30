@@ -40,7 +40,7 @@ export class ChannelService {
      * @param {string} channelId - ID du channel Discord
      * @throws {Error} - Si le channel est introuvable ou invalide
      */
-    init(channelId) {
+    async init(channelId) {
         if (this.#initialized) {
             console.warn("[ChannelService] Déjà initialisé. Utilisez l'instance existante.");
             return;
