@@ -26,16 +26,16 @@ export class GameService {
     }
 
     /**
-     * Planifie la réinitialisation quotidienne des jetons de jeu (tous les jours à minuit)
+     * Planifie la réinitialisation des jetons de jeu (toutes les heures, à la minute 0)
      * À appeler une seule fois au démarrage du bot
      */
     startDailyResetSchedule() {
-        this.resetJob = schedule.scheduleJob('0 0 * * *', () => {
+        this.resetJob = schedule.scheduleJob('0 * * * *', () => {
             this.resetAllGameTokens().catch(error => {
                 console.error('Erreur lors du reset des jetons de jeu :', error);
             });
         });
-        console.log('Reset quotidien des jetons de jeu planifié à minuit');
+        console.log('Reset des jetons de jeu planifié toutes les heures');
     }
 
     /**

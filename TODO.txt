@@ -1,21 +1,25 @@
-Objectif v0.1 : 
--Création guide utilisateur
-
 TODO :
 
 -Changer texte capture pour avancer point par point et à chaque point on a une chance d'échouer ou de continuer jusqu'au succès
 -Ajouter gain d'xp sur capture
 -Ajouter bonus capture rate en fonction du lvl du dresseur
--Tous les jours on peut tenter de capturer un Pokémon
-    -Daily reset
--Check que deux utilisateurs ne peuvent pas s'embrouiller sur les msg
 -Créer zones où les dresseurs peuvent se déplacer (pkm 1 à 20 dispo par exemple, shop différents...)
--Ajout field "DailyCaptureDone"/Hourly maybe ?
--Ajout field "DailyGame"/Hourly maybe ?
+-!pokedex a remanier pour indiquer quels pokémons sont capturés
 
 Feature :
 
 -Ajout commande leaderboard pour voir le classement des joueurs
 
 Bug : 
-Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête.
+-Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête.
+
+A tester:
+-!shop ajouter le solde actuel du joueur
+-Revoir !game pour jouer un certain nombre de fois, mais gagner moins
+-Revoir messages aléatoires du bot
+-Expliciter le format de réponse attendu pour le choix de ball (donner un exemple)
+-Dans l'utilisation de !shop le message de timeout semble apparaître à chaque achat
+-Ajouter un message du bot dans le channel pour dire qu'il vient de démarrer en telle version, avec telles features, et que la version est déployée depuis telle date (en cas de redémarrage ultérieur)
+
+Done :
+-Donner de l'argent au départ aux joueurs

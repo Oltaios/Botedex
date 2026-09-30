@@ -34,14 +34,18 @@ export async function execute(message, pendingResponses) {
         new Ball('superball'),
         new Ball('hyperball')
     ];
+
+    const moneyAvailable = await bddService.getMoneyForUser(currentUserId);
     
     let messageInventoryShop = "🏪 **Bienvenue au Shop de Netto !**\n\n";
+    messageInventoryShop += `💰 Tu as ${moneyAvailable}$\n`
     messageInventoryShop += "📋 **Inventaire disponible :**\n";
     
     shopInventory.forEach(element => {
         messageInventoryShop += `${element.getType()} : ${element.getPrice()}$\n`;
     });
-    
+
+        
     // Inventaire et format regroupés en un seul reply pour ne pinger qu'une fois
     messageInventoryShop += "Format de réponse attendu : `<type de ball><nombre>` (ex: `!pokeball5` pour 5 Pokéballs)";
     await channelService.replySafe(message, messageInventoryShop);
@@ -101,7 +105,9 @@ export async function execute(message, pendingResponses) {
     });
     
     collector.on('end', () => {
-        channelService.replySafe(message, "Sortie du shop (faut aller plus vite gamin, y a la queue derrière toi)");
+        if (collector.endReason === 'time') {
+            channelService.replySafe(message, "Un grand gaillard t'attrapes par le colbac et te fout dehors, fallait choisir plus vite... (Sortie du shop)");
+        }
         pendingResponses.delete(responseKey); // Libère la clé
     });
 }

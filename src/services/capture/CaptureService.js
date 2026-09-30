@@ -58,7 +58,7 @@ export class CaptureService {
 
             // Inventaire et question regroupés pour ne pinger qu'une seule fois
             const inventoryDisplay = await inventoryService.getInventoryDisplay(message.author.id);
-            await channelService.replySafe(message, inventoryDisplay + "\nQuelle pokéball veux-tu utiliser ?");
+            await channelService.replySafe(message, inventoryDisplay + `\nQuelle pokéball veux-tu utiliser ? Exemple de réponse attendu **!pokeball**`);
             const filter = m => m.author.id === message.author.id &&
                 (m.content === '!pokeball' ||
                 m.content === '!superball' ||

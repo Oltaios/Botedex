@@ -1,8 +1,9 @@
 /**
  * Service de gestion des spawns de Pokémon
  * Responsabilité : faire apparaître des Pokémon aléatoires dans le channel
- * principal du bot, à intervalles réguliers tirés dans la plage configurée
- * (spawn.minIntervalMinutes / maxIntervalMinutes de gameConfig.json).
+ * principal du bot, chaque spawn étant planifié après un délai aléatoire
+ * re-tiré dans la plage configurée (spawn.minIntervalMinutes /
+ * maxIntervalMinutes de gameConfig.json).
  * Le numéro du Pokémon actif est exposé via setNumPkmAvailable() dans
  * core/client.js pour que CaptureService sache qui est capturable.
  *
@@ -21,7 +22,7 @@ import { PhrasesAleatoires } from '../../utils/phrasesAleatoires.js';
 export class SpawnService {
     constructor() {
         this.config = getConfig();
-        this.spawnInterval = null;
+        this.spawnTimer = null;
         // Pools de phrases pour varier les annonces de spawn
         this.annoncesSpawn = new PhrasesAleatoires([
             "Un pokémon apparaît ! Il s'agit de {nomPoke} [{numPkm}] !",
@@ -31,36 +32,48 @@ export class SpawnService {
             "Tremblez, mortels : {nomPoke} [{numPkm}] vient d'apparaître !"
         ]);
         this.appelsCapture = new PhrasesAleatoires([
-            "Lancez !capture pour tenter de le seques... de le capturer !",
-            "Tapez !capture avant qu'il ne décamp...",
-            "Un petit !capture, ça vous tente ? Il ne se capturera pas tout seul.",
-            "!capture maintenant, ou pleurez plus tard."
+            `Lancez **!capture** pour tenter de le seques... de le capturer !`,
+            `Tapez **!capture** avant qu'il ne décampe !`,
+            `Un petit **!capture**, ça vous tente ? Il ne se capturera pas tout seul.`,
+            `**!capture** maintenant, ou pleurez plus tard.`
         ]);
     }
 
     /**
      * Démarre le spawn automatique de Pokémon
-     * Un premier spawn immédiat, puis un spawn toutes les X minutes
-     * (X tiré aléatoirement une bonne fois au démarrage)
+     * Un premier spawn immédiat, puis un nouveau spawn après un délai
+     * aléatoire re-tiré à chaque fois dans la plage configurée
      * @returns {void}
      */
     startSpawn() {
-        if (this.spawnInterval) {
+        if (this.spawnTimer) {
             this.stopSpawn();
         }
 
-        const minMinutes = this.config.spawn.minIntervalMinutes;
-        const maxMinutes = this.config.spawn.maxIntervalMinutes;
-        const randomDelay = this.getRandomDelay(minMinutes, maxMinutes);
-
-        console.log(`[SPAWN] Démarrage des spawns (toutes les ${randomDelay} minutes)`);
+        console.log('[SPAWN] Démarrage des spawns');
 
         // Premier spawn immédiat
         this.spawnPokemon();
 
-        // Puis spawns réguliers
-        this.spawnInterval = setInterval(() => {
+        // Puis spawns réguliers, avec un délai re-tiré aléatoirement à chaque fois
+        this.scheduleNextSpawn();
+    }
+
+    /**
+     * Planifie le prochain spawn après un délai aléatoire
+     * Re-planifie à chaque exécution pour re-tirer le délai
+     * @returns {void}
+     */
+    scheduleNextSpawn() {
+        const minMinutes = this.config.spawn.minIntervalMinutes;
+        const maxMinutes = this.config.spawn.maxIntervalMinutes;
+        const randomDelay = this.getRandomDelay(minMinutes, maxMinutes);
+
+        console.log(`[SPAWN] Prochain spawn dans ${randomDelay} minutes`);
+
+        this.spawnTimer = setTimeout(() => {
             this.spawnPokemon();
+            this.scheduleNextSpawn();
         }, randomDelay * 60 * 1000); // Convertit les minutes en millisecondes
     }
 
@@ -68,9 +81,9 @@ export class SpawnService {
      * Arrête le spawn automatique
      */
     stopSpawn() {
-        if (this.spawnInterval) {
-            clearInterval(this.spawnInterval);
-            this.spawnInterval = null;
+        if (this.spawnTimer) {
+            clearTimeout(this.spawnTimer);
+            this.spawnTimer = null;
             console.log('[SPAWN] Arrêt des spawns');
         }
     }

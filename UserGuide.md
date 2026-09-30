@@ -71,7 +71,7 @@ d'inspiration.)
 ### `!work`
 
 Tu pars travailler pour une durée d'**une heure** afin de générer **100 Pokédollars**.
-Reviens quand la pause cloche sonne, ta paye est versée automatiquement.
+Reviens quand la cloche sonne, ta paye est versée automatiquement.
 
 ### `!game`
 
@@ -80,8 +80,8 @@ Un POKEMON apparaît, tu devras deviner son **type** !
 - Exemple : si Evoli apparaît, réponds `!normal`.
 - Pour un double type comme Bulbizarre, réponds `!grass/poison` — l'ordre n'importe pas
   (les devs sont sympas).
-- Tu as **15 secondes** et **3 essais**.
-- Une seule partie par jour : à minuit, tout le monde peut rejouer.
+- Tu as **30 secondes** et **3 essais**.
+- Une seule partie par heure : à chaque début d'heure, tout le monde peut rejouer.
 - Trouve le bon type et **100 Pokédollars** sont à toi !
 
 ### `!shop`

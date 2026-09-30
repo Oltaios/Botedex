@@ -14,6 +14,7 @@ import { gameService } from '../services/game/GameService.js';
 import { workService } from '../services/economy/WorkService.js';
 import { channelService } from '../services/channel/ChannelService.js';
 import { registerAllEvents } from '../events/index.js';
+import { getConfig } from '../utils/configLoader.js';
 
 
 
@@ -39,7 +40,14 @@ async function initServices() {
         process.exit(1);
     }
 
-    channelService.init(process.env.DISCORD_CHANNEL_ID);
+    await channelService.init(process.env.DISCORD_CHANNEL_ID);
+    let versionBotedex = getLogVersion();
+    let patchNote = getConfig().release.notes;
+    try {
+        await channelService.sendMessage(`Démarrage du Botedex... Je suis up !\n${await versionBotedex}\n\n${patchNote}`);
+    } catch (error) {
+        console.error('❌ Impossible d\'envoyer le message de démarrage:', error);
+    }
     
     // Réinitialise les jetons de jeu
     await gameService.resetAllGameTokens();
@@ -76,13 +84,14 @@ client.once('ready', async () => {
  * Affiche la version du bot, lue depuis package.json (source de vérité)
  * @returns {Promise<void>}
  */
-async function logVersion() {
+async function getLogVersion() {
     try {
         const packageUrl = new URL('../../package.json', import.meta.url);
         const pkg = JSON.parse(await readFile(packageUrl, 'utf8'));
-        console.log(`📦 Botedex v${pkg.version}`);
+        return `📦 Botedex v${pkg.version}`;
     } catch (error) {
         console.warn('Version indisponible :', error.message);
+        return 'Erreur lors de la lecture de la version';
     }
 }
 
@@ -93,7 +102,7 @@ async function logVersion() {
  * @returns {Promise<void>}
  */
 async function startBot() {
-    await logVersion();
+    console.log(`Version du bot : ${await getLogVersion()}`);
     console.log('🚀 Démarrage du bot...');
     
     // 2️⃣ Enregistre TOUS les événements Discord

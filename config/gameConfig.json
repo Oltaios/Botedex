@@ -22,7 +22,7 @@
   },
   "game": {
     "numberOfPokemon": 151,
-    "guessMyTypeTimeMs": 15000,
+    "guessMyTypeTimeMs": 30000,
     "guessMyTypeMaxAttempts": 3,
     "guessMyTypeRewardSingle": 100,
     "guessMyNameReward": 50
@@ -35,5 +35,8 @@
       "rare": 0.25,
       "legendary": 0.05
     }
+  },
+  "release": {
+    "notes": "📝 Patch note\n\n✨ Features :\n- Message de démarrage avec version et patch note dans le channel principal\n- Reset des jetons de jeu toutes les heures (au lieu de minuit)\n- Ajout du solde du dresseur lors de l'entrée dans le !shop\n\n🐛 Corrections :\n- Gestion des erreurs lors de la création de compte (!jeVeuxJouer...)\n- Affichage de la version au démarrage\n- Correction du message de sortie du shop\n- Format de réponse attendu pour le choix des balls pendant une capture ajouté\n- Les dresseurs démarrent désormais le jeu avec 500 pokédollars pour pouvoir manger des pâtes\n- Passage de 15 à 30 secondes pour chaque tentative du jeu Guess My Type (Tout le monde n'a pas un aussi gros cerveau que le Botedex...)\n- Correction de la fréquence des spawns qui est maintenant aléatoire (pour cette version entre 3 et 10 minutes)"
   }
 }
