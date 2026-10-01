@@ -15,11 +15,9 @@ import * as work from './work.js';
 import * as money from './money.js';
 import * as balls from './balls.js';
 import * as pokedex from './pokedex.js';
-import * as gif from './gif.js';
 import * as help from './help.js';
-import * as startSpawn from './startSpawn.js';
 
-export { ping, capture, shop, game, work, money, balls, pokedex, gif, help, startSpawn };
+export { ping, capture, shop, game, work, money, balls, pokedex, help };
 
 /**
  * Liste toutes les commandes disponibles
@@ -35,8 +33,6 @@ export function getAllCommands() {
         money.metadata,
         balls.metadata,
         pokedex.metadata,
-        gif.metadata,
-        help.metadata,
-        startSpawn.metadata
+        help.metadata
     ];
 }

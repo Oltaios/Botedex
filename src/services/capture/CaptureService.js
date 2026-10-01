@@ -16,7 +16,7 @@ import { bddService } from '../bdd/BDDService.js';
 import { moneyService } from '../economy/MoneyService.js'
 import { getConfig } from '../../utils/configLoader.js';
 import { Ball } from '../../models/Ball.js';
-import { setNumPkmAvailable, getNumPkmAvailable } from '../../core/client.js';
+import { setNumPkmAvailable, getNumPkmAvailable, setLockPkmAvailable, setTentativesCapture, getTentativesCapture, addTentativesCapture } from '../../core/client.js';
 import { inventoryService } from '../economy/InventoryService.js';
 import  { pendingResponses } from '../../core/client.js'
 import { parsingPkm } from '../../utils/parsing.js';
@@ -32,11 +32,10 @@ export class CaptureService {
      * Gère l'événement de capture déclenché par la commande !capture
      * Flux : vérifie qu'un Pokémon est disponible (spawn actif), vérifie que
      * le dresseur possède au moins une ball, affiche son inventaire, attend
-     * le choix de la ball (!pokeball/!superball/!hyperball, 15 s max),
+     * le choix de la ball (!pokeball/!superball/!hyperball, 15 s max,
      * décompte la ball puis lance le tirage de capture.
      * Toutes les étapes sont envoyées en reply à la commande.
-     * À la fin (temps écoulé, choix fait ou limite atteinte), libère la clé
-     * de réponse et vide le spawn en cours.
+     * À la fin (temps écoulé ou ball effectivement décomptée), libère la clé de réponse
      * @param {Object} message - Message Discord ayant déclenché la commande
      * @param {string} responseKey - Clé de réponse enregistrée dans pendingResponses
      * @returns {Promise<void>}
@@ -53,6 +52,7 @@ export class CaptureService {
                 await channelService.replySafe(message, "🎒 Tes poches sont vides ! File au shop d'abord avec `!shop` pour t'équiper en balls, le pokémon t'attendra peut-être encore.");
                 console.log("[CAPTURE] Appel de capture.js suppression de responseKey : " + responseKey);
                 pendingResponses.delete(responseKey);
+                setLockPkmAvailable(0); // Le spawn reste actif : re-capturable
                 return;
             }
 
@@ -63,37 +63,84 @@ export class CaptureService {
                 (m.content === '!pokeball' ||
                 m.content === '!superball' ||
                 m.content === '!hyperball');
-            const collector = message.channel.createMessageCollector({ filter, max: 1, time: 15_000 });
+            // Un choix de type épuisé n'arrête pas la capture, l'utilisateur peut retenter un autre type dans le temps restant
+            const collector = message.channel.createMessageCollector({ filter, time: 15_000 });
+            // Garde-fou anti double tir : deux messages de choix quasi
+            // simultanés ne doivent pas consommer deux balls
+            let captureDone = false;
 
+            //Collecteur de choix de ball
             collector.on("collect", async (ballChoiceMessage) => {
+                if (captureDone) return;
+                captureDone = true;
                 console.log("[CAPTURE] Type de ball à utiliser = " + ballChoiceMessage.content.slice(1));
+
                 if(await bddService.tryToLoseBall(ballChoiceMessage.author.id, ballChoiceMessage.content.slice(1)) == 0){
-                    await this.capture(message.author.id, pokemonAvailable[1], ballChoiceMessage.content.slice(1), pokemonAvailable[0], numPkm, message);
+                    //L'utilisateur a pu utiliser une ball, son essai est consommé
+                    await addTentativesCapture(message.author.id);
+                    
+                    const reussiteCapture = await this.capture(message.author.id, pokemonAvailable[1], ballChoiceMessage.content.slice(1), pokemonAvailable[0], numPkm, message);
+                    
+                    //Le lancer a pu être effectué, succès ou échec à contrôler
+                    await channelService.replySafe(message, ".", 1000);
+                    await channelService.replySafe(message, "..", 1000);
+                    await channelService.replySafe(message, "...", 1000);
+
+                    if(reussiteCapture){
+                        // Succès : Pokémon capturé
+                        //On reset les flags de capture
+                        setNumPkmAvailable(null);
+                        setLockPkmAvailable(null);
+                        const alreadyCaptured = await bddService.alreadyCaptured(message.author.id, numPkm);
+                                
+                        if (alreadyCaptured) {
+                            const reventeReward = this.config.economy.duplicateCaptureReward;
+                            // Pokémon déjà capturé
+                            await channelService.replySafe(message, `**Clic !**\nVous avez déjà capturé ce Pokémon, vous décidez de vendre ses organes à la Team Rocket et gagnez ${reventeReward}$, bien joué!`);
+                            moneyService.gainMoney(message.author.id, reventeReward);
+                            await bddService.incrementCaptureCount(message.author.id);
+                             
+                        } else {
+                            // Nouveau Pokémon !
+                            await channelService.replySafe(message, `**Clic !**\nNouveau Pokémon ! Mise à jour du Pokédex SHEEEEEEEEEEEEEESH`);
+                            await bddService.registerNewCapture(message.author.id, numPkm);
+                        }
+                                    
+                    }
+                    else{
+                        // Échec : Pokémon non capturé
+                        await channelService.replySafe(message, "Le Pokémon s'est échappé ! Mais tu as quand même essayé, c'est déjà ça, loser. Place au suivant !");
+                        setLockPkmAvailable(0); //On libère le lock du pokémon
+                    }
+                    //Declenche la fin de la capture
                     collector.stop();
                 }
                 else{
-                    // Répond au message de choix : c'est une réaction directe à ce qu'il vient de taper
-                    await channelService.replySafe(ballChoiceMessage, "Vous n'avez pas assez de ce type de ball !");
+                    // Ball épuisée : la capture continue, l'utilisateur peut
+                    // retenter un autre type dans le temps restant
+                    captureDone = false;
+                    // Ré-affiche l'inventaire pour guider le nouveau choix
+                    const inventoryDisplay = await inventoryService.getInventoryDisplay(ballChoiceMessage.author.id);
+                    await channelService.replySafe(ballChoiceMessage, `Vous n'avez pas assez de ce type de ball !
+                    ${inventoryDisplay}`);
                 }
             });
 
             collector.on("end", () => {
                 if (collector.endReason === 'time') {
                     channelService.replySafe(message, `Ça dort ici, temps écoulé ! Fin de la **!capture** !`);
-                }
-                else if (collector.endReason === 'limit') {
-                    channelService.replySafe(message, `Fin de la **!capture** !`);
+                    //On reset les flags de capture
+                    setLockPkmAvailable(0); //On libère le lock du pokémon
                 }
                 console.log("[CAPTURE] Appel de capture.js suppression de responseKey : " + responseKey);
                 pendingResponses.delete(responseKey);
-
-                setNumPkmAvailable(null);
             });
         }
         else{
             await channelService.replySafe(message, "Aucun pokémon disponible, reviens plus tard !");
             console.log("[CAPTURE] Appel de capture.js suppression de responseKey : " + responseKey);
             pendingResponses.delete(responseKey);
+            setLockPkmAvailable(null); // Aucun spawn actif
         }
     }
 
@@ -107,7 +154,7 @@ export class CaptureService {
      * @param {string} pkmName - Nom du Pokémon visé (pour les messages uniquement)
      * @param {number} numPkm - Numéro du Pokémon (clé de stockage dans le Pokédex du dresseur)
      * @param {Object} commandMessage - Message !capture d'origine, cible des replies
-     * @returns {Promise<boolean>} - true si nouveau Pokémon capturé, false sinon (échec du tirage ou déjà capturé)
+     * @returns {Promise<boolean>} - true si nouveau Pokémon capturé, false sinon (échec du tirage)
      */
     async capture(userId, captureRate, ballType, pkmName, numPkm, commandMessage) {
         // Crée la ball utilisée
@@ -115,30 +162,32 @@ export class CaptureService {
 
         // Calcule le taux de capture final (base * rate de la ball)
         const finalCaptureRate = captureRate * ball.getRate();
-        const threshold = 100 - (finalCaptureRate / 3); // Même formule que ton code actuel
+        const threshold = 100 - (finalCaptureRate / 3);
         const rng = Math.floor(Math.random() * 100);
 
         console.log(`[CAPTURE] User: ${userId}, Pokémon: ${pkmName}, Ball: ${ballType}, ` +
                   `Rate: ${finalCaptureRate}, RNG: ${rng}, Threshold: ${threshold}`);
 
-        if (rng * ball.getRate() >= threshold) {
-            // Succès : Pokémon capturé
-            const alreadyCaptured = await bddService.alreadyCaptured(userId, numPkm);
+        
+        // Commentaire de lancer selon la qualité du tirage (rng 0-99)
+        switch (true) {
+            case rng >= 90:
+                await channelService.replySafe(commandMessage, `En grandes pompes, tu lances ta ball avec une confiance remarquable, digne des plus grands dresseurs (RNG = ${rng})`);
+                break;
+            case rng >= 50:
+                await channelService.replySafe(commandMessage, `Tu saisis ta ball et tu réalises un beau lancer ! (RNG = ${rng})`);
+                break;
+            case rng >= 10:
+                await channelService.replySafe(commandMessage, `Aïe, le lancer part de travers, la ball frôle le Pokémon... (RNG = ${rng})`);
+                break;
+            default:
+                await channelService.replySafe(commandMessage, `Tu t'élances avec ta ball, mais une envie pressante se fait sentir... (RNG = ${rng})`);
+                break;
+        }
 
-            if (alreadyCaptured) {
-                await channelService.replySafe(commandMessage, "Vous avez déjà capturé ce Pokémon, vous décidez de vendre ses organes à la Team Rocket et gagnez 250$, bien joué!");
-                moneyService.gainMoney(userId, 250);
-                await bddService.incrementCaptureCount(userId);
-                return false; // Pokémon déjà capturé
-            } else {
-                // Nouveau Pokémon !
-                await channelService.replySafe(commandMessage, "Nouveau Pokémon ! Mise à jour du Pokédex SHEEEEEEEEEEEEEESH");
-                await bddService.registerNewCapture(userId, numPkm);
-                return true; // Capture réussie
-            }
+        if (rng * ball.getRate() >= threshold) {
+            return true; //Succès capture
         } else {
-            // Échec : Pokémon non capturé
-            await channelService.replySafe(commandMessage, "Le Pokémon s'est échappé ! Mais tu as quand même essayé, c'est déjà ça, loser.");
             return false; // Capture échouée
         }
     }

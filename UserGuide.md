@@ -49,7 +49,7 @@ Quelques précisions de labo :
 
 | Commande | Effet | Détail |
 |---|---|---|
-| `!jeVeuxJouerStp...` | Créer ton compte | Obligatoire pour jouer |
+| `!jeVeuxJouerStpCreeMoiUnComptePourquoiCetteCommandeEstSiLongueJeHaisLesDevs` | Créer ton compte | Obligatoire pour jouer |
 | `!capture` | Capturer le Pokémon apparu | Voir section ci-dessus |
 | `!work` | Partir travailler | 100 $ après 1 heure |
 | `!money` | Consulter ton solde | |
@@ -57,10 +57,8 @@ Quelques précisions de labo :
 | `!game` | Mini-jeu « devine le type » | 100 $ si tu gagnes |
 | `!pokedex` | Nombre de POKEMONS capturés | Pour flex en grande légende |
 | `!shop` | Acheter des balls | Voir section ci-dessous |
-| `!gif` | Sticker Giphy sur un mot-clé | |
 | `!help` | Liste des commandes | Pour les tête en l'air |
 | `!ping` | Vérifier que le bot est réveillé | Il répond Pong. C'est tout. |
-| `!startSpawn` | Relancer les apparitions | Réservée au PROF |
 
 ### `!jeVeuxJouerStpCreeMoiUnComptePourquoiCetteCommandeEstSiLongueJeHaisLesDevs`
 
