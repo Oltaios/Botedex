@@ -5,21 +5,36 @@ TODO :
 -Ajouter bonus capture rate en fonction du lvl du dresseur
 -Créer zones où les dresseurs peuvent se déplacer (pkm 1 à 20 dispo par exemple, shop différents...)
 -!pokedex a remanier pour indiquer quels pokémons sont capturés
+-Revoir formule calcul capture
 
 Feature :
 
 -Ajout commande leaderboard pour voir le classement des joueurs
+-Ajout temps de réaction capture
+-Ajout duel pour capturer le pokémon
+-Afficher la RNG des captures et faire des messages en conséquence
+-Ajout possibilité capture en une commande pour les utilisateurs expérimentés
+-Remanier messages capture en succès
+-Ajouter emoji sur le message du joueur en cas d'échec -> LOSER ou CACA
 
 Bug : 
--Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête.
 
 A tester:
--!shop ajouter le solde actuel du joueur
--Revoir !game pour jouer un certain nombre de fois, mais gagner moins
--Revoir messages aléatoires du bot
--Expliciter le format de réponse attendu pour le choix de ball (donner un exemple)
--Dans l'utilisation de !shop le message de timeout semble apparaître à chaque achat
--Ajouter un message du bot dans le channel pour dire qu'il vient de démarrer en telle version, avec telles features, et que la version est déployée depuis telle date (en cas de redémarrage ultérieur)
 
 Done :
--Donner de l'argent au départ aux joueurs
+
+-Suppression accès commande !gif
+-Suppression commande !startSpawn
+-QOL : Ajout message délai restant pour la fin du !work #Sharoah
+-!work envoie désormais un message au joueur (en réponse à la commande !work) quand le travail est fait
+-Rework capture :
+    -Ajout lock de capture réel (Le doublon peut exister, mais jouez au loto plutôt) #Soon
+    -Tentative de capture unique par dresseur (la tentative est comptabilisée au lancement de la ball) #Soon + Sharoah
+    -Ajout phrases aléatoires shiny avec des réfs pour le spawn des Pokémons #Khearue
+    -Message de suspens pendant une capture
+    -Affichage du score de RNG avec message en fonction #Khearue
+
+Bugs corrigés :
+
+-Raichu double type électrique #Alombria
+-Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête. #Alombria

@@ -8,7 +8,7 @@
  */
 
 import { captureService } from '../services/capture/CaptureService.js';
-import { pendingResponses } from '../core/client.js';
+import { pendingResponses, getLockPkmAvailable, setLockPkmAvailable, getTentativesCapture } from '../core/client.js';
 import { channelService } from '../services/channel/ChannelService.js';
 
 /**
@@ -19,6 +19,19 @@ import { channelService } from '../services/channel/ChannelService.js';
  */
 export async function execute(message) {
     if (!metadata.adminOnly) {
+
+        if(getTentativesCapture() !== null && getTentativesCapture().has(message.author.id)){
+            await channelService.replySafe(message, "C'est le genre d'occasion qu'on a qu'une seule fois dans une vie, tu décides de laisser la place aux autres...");
+            return;
+        }
+
+        // Un seul flux de capture à la fois sur le spawn actif
+        if (getLockPkmAvailable() === 1) {
+            await channelService.replySafe(message, "Tu t'apprêtes à saisir ta plus belle pokéball mais il semblerait que quelqu'un ait été plus rapide que toi...");
+            return;
+        }
+        setLockPkmAvailable(1);
+
         const responseKey = `capture-${message.author.id}`;
         console.log("Appel de capture.js ajout de responseKey : " + responseKey);
         pendingResponses.add(responseKey);

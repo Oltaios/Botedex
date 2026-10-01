@@ -14,18 +14,26 @@
  *   const message = pool.piocher({ nomPoke: 'Pikachu' });
  */
 
+import { RandomUtils } from './randomUtils.js';
+
 export class PhrasesAleatoires {
     #phrases = [];
+    #phrasesRares = [];
     #dernierIndex = -1;
 
     /**
      * @param {Array<string>} [phrases] - Gabarits initiaux ; les séquences
      *        {clef} seront remplacées par les valeurs passées à piocher()
+     * @param {Array<string>} [phrasesRares] - Gabarits initiaux ; les séquences
+     *        {clef} seront remplacées par les valeurs passées à piocher()
      * @throws {Error} - Si un gabarit n'est pas une chaîne non vide
      */
-    constructor(phrases = []) {
+    constructor(phrases = [], phrasesRares = []) {
         for (const phrase of phrases) {
-            this.ajouter(phrase);
+            this.ajouter(phrase, false);
+        }
+        for (const phrase of phrasesRares) {
+            this.ajouter(phrase, true);
         }
     }
 
@@ -34,12 +42,19 @@ export class PhrasesAleatoires {
      * @param {string} phrase - Gabarit à ajouter
      * @returns {void}
      */
-    ajouter(phrase) {
+    ajouter(phrase, isRare) {
         if (typeof phrase !== 'string' || phrase.trim() === '') {
             throw new Error(`Gabarit invalide : ${JSON.stringify(phrase)}`);
         }
-        this.#phrases.push(phrase);
-        this.#dernierIndex = -1; // L'anti-répétition repart de zéro
+        if(!isRare){
+            this.#phrases.push(phrase);
+            this.#dernierIndex = -1; // L'anti-répétition repart de zéro
+        }
+        else{
+            //Cas ajout phrase rare
+            this.#phrasesRares.push(phrase)
+        }
+        
     }
 
     /**
@@ -59,18 +74,30 @@ export class PhrasesAleatoires {
      * @returns {string} - Phrase prête à envoyer, chaîne vide si le pool est vide
      */
     piocher(params = {}) {
-        if (this.#phrases.length === 0) {
-            return '';
-        }
+        //On tire un nombre au sort pour décider si on pioche une phrase commune ou rare
+        let tirage = RandomUtils.nombreAleatoire(1, 100);
 
-        let index = Math.floor(Math.random() * this.#phrases.length);
-        if (this.#phrases.length > 1 && index === this.#dernierIndex) {
-            // Retombe sur la phrase qui vient d'être tirée : décale d'un cran
-            index = (index + 1) % this.#phrases.length;
-        }
-        this.#dernierIndex = index;
+        if(tirage < 95 || this.#phrasesRares.length === 0){
+            //Cas tirage phrase commune
+            if (this.#phrases.length === 0) {
+                return '';
+            }
 
-        return this.#substituer(this.#phrases[index], params);
+            let index = Math.floor(Math.random() * this.#phrases.length);
+            if (this.#phrases.length > 1 && index === this.#dernierIndex) {
+                // Retombe sur la phrase qui vient d'être tirée : décale d'un cran
+                index = (index + 1) % this.#phrases.length;
+            }
+            this.#dernierIndex = index;
+
+            return this.#substituer(this.#phrases[index], params);
+        }
+        else{
+            //Cas tirage phrase rare
+            let index = Math.floor(Math.random() * this.#phrasesRares.length);
+            return this.#substituer(this.#phrasesRares[index], params);
+
+        }
     }
 
     /**

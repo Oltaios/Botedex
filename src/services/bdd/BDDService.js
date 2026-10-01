@@ -6,7 +6,7 @@
  *
  * Schéma du document dresseur (collection 'dresseurs', _id = ID Discord) :
  *   { _id, name, argent, nbrCapture, captureAvailable, gameAvailable,
- *     isWorking, pokeball, superball, hyperball,
+ *     isWorking, workStartTime, pokeball, superball, hyperball,
  *     '<numéroPokémon>' (1-151): 0|1, ... }
  *
  * Utilisation :
@@ -274,7 +274,8 @@ export class BDDService {
             isWorking: 0,
             pokeball: 0,
             superball: 0,
-            hyperball: 0
+            hyperball: 0,
+            workStartTime: null
         };
         // Ajoute les champs pour les Pokémon 1-151 (génération 1 du CSV)
         for (let i = 1; i <= 151; i++) {
@@ -287,15 +288,35 @@ export class BDDService {
      * Marque un dresseur comme parti travailler (réservation atomique)
      * La condition isWorking = 0 est dans le filtre : deux appels simultanés
      * ne peuvent pas tous deux réserver le dresseur
+     * Enregistre l'heure de début de session (workStartTime) pour
+     * permettre le calcul du temps restant
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number>} - 0 si possible, 1 s'il travaille déjà (ou n'existe pas)
      */
     async userGoToWork(userId) {
         const result = await this.db.collection('dresseurs').updateOne(
             { _id: userId, isWorking: 0 },
-            { $set: { isWorking: 1 } }
+            { $set: { isWorking: 1, workStartTime: Date.now() } }
         );
         return result.matchedCount === 0 ? 1 : 0; // Peut travailler
+    }
+
+    /**
+     * Retourne l'heure de début de session de travail d'un dresseur
+     * Projection sur le seul champ workStartTime : évite de charger
+     * tout le document (151 champs Pokédex) pour une simple lecture
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<number|null>} - Timestamp de début en ms, ou null
+     *          si le dresseur n'existe pas / n'a jamais travaillé
+     */
+    async getStartWorkTimeUser(userId) {
+        const row = await this.db.collection('dresseurs').findOne(
+            { _id: userId },
+            { projection: { _id: 0, workStartTime: 1 } }
+        );
+        // ?? null normalise undefined (champ absent) en null : le contrat
+        // de la methode est "null si pas de session", quel que soit le stockage
+        return row?.workStartTime ?? null;
     }
 
     /**

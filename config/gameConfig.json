@@ -2,34 +2,35 @@
   "balls": {
     "pokeball": {
       "rate": 1,
-      "price": 10,
+      "price": 20,
       "feesMultiplier": 1
     },
     "superball": {
       "rate": 1.5,
-      "price": 15,
+      "price": 35,
       "feesMultiplier": 1
     },
     "hyperball": {
       "rate": 2,
-      "price": 20,
+      "price": 70,
       "feesMultiplier": 1
     }
   },
   "economy": {
-    "workReward": 100,
+    "workReward": 80,
+    "duplicateCaptureReward": 100,
     "gameCooldownHours": 24
   },
   "game": {
     "numberOfPokemon": 151,
     "guessMyTypeTimeMs": 30000,
     "guessMyTypeMaxAttempts": 3,
-    "guessMyTypeRewardSingle": 100,
+    "guessMyTypeRewardSingle": 80,
     "guessMyNameReward": 50
   },
   "spawn": {
-    "minIntervalMinutes": 3,
-    "maxIntervalMinutes": 10,
+    "minIntervalMinutes": 5,
+    "maxIntervalMinutes": 12,
     "pokemonRarity": {
       "common": 0.7,
       "rare": 0.25,
@@ -37,6 +38,6 @@
     }
   },
   "release": {
-    "notes": "📝 Patch note\n\n✨ Features :\n- Message de démarrage avec version et patch note dans le channel principal\n- Reset des jetons de jeu toutes les heures (au lieu de minuit)\n- Ajout du solde du dresseur lors de l'entrée dans le !shop\n\n🐛 Corrections :\n- Gestion des erreurs lors de la création de compte (!jeVeuxJouer...)\n- Affichage de la version au démarrage\n- Correction du message de sortie du shop\n- Format de réponse attendu pour le choix des balls pendant une capture ajouté\n- Les dresseurs démarrent désormais le jeu avec 500 pokédollars pour pouvoir manger des pâtes\n- Passage de 15 à 30 secondes pour chaque tentative du jeu Guess My Type (Tout le monde n'a pas un aussi gros cerveau que le Botedex...)\n- Correction de la fréquence des spawns qui est maintenant aléatoire (pour cette version entre 3 et 10 minutes)"
+    "notes": "📝 Patch note\n\n✨ Features :\n- Rework capture :\n\n  -Ajout lock de capture réel (Le doublon peut exister, mais jouez au loto plutôt) **@Soon**\n  -Tentative de capture unique par dresseur (la tentative est comptabilisée au lancement de la ball) **@Soon** + **@Sharoah**\n  -Ajout phrases aléatoires shiny avec des réfs pour le spawn des Pokémons **@Khearue**\n  -Message de suspens pendant une capture\n  -Affichage du score de RNG avec message en fonction **@Khearue**\n\n- QOL : Ajout message délai restant pour la fin du !work **@Sharoah**\n- !work envoie désormais un message au joueur (en réponse à la commande !work) quand le travail est fait\n\n🐛 Corrections :\n- Raichu était en double type électrique, ce qui faussait le !game GuessMyType **@Alombria**\n- Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête. **@Alombria** "
   }
 }

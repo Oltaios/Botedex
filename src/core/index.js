@@ -116,9 +116,6 @@ async function startBot() {
         console.error('❌ Échec de la connexion à Discord:', error);
         process.exit(1);
     }
-
-    // Initialise les services
-    //await initServices();
         
 }
 

@@ -109,9 +109,17 @@ export class ChannelService {
      * (fin de collector, lenteur)
      * @param {Object} message - Message Discord auquel répondre
      * @param {string} content - Contenu à envoyer
+     * @param {number} [delayMs=0] - Délai optionnel avant l'envoi, en millisecondes ;
+     *        0 (défaut) = envoi immédiat, rétrocompatible avec tous les
+     *        appels existants à deux arguments
      * @returns {Promise<void>}
      */
-    async replySafe(message, content) {
+    async replySafe(message, content, delayMs = 0) {
+        if (delayMs > 0) {
+            // Attend avant l'envoi ; ne suspend que le flux appelant,
+            // pas l'event loop : les autres joueurs continuent de jouer
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
         try {
             await message.reply(content);
         } catch (error) {

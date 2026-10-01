@@ -101,12 +101,6 @@ export async function handle(message) {
                 case '!pokedex':
                     await commands.pokedex.execute(message);
                     break;
-                case '!gif':
-                    await commands.gif.execute(message, pendingResponses);
-                    break;
-                case '!startSpawn':
-                    await commands.startSpawn.execute(message);
-                    break;
                 default:
                     // Commande inconnue
                     await channelService.replySafe(

@@ -34,6 +34,7 @@ export async function sendGif(keyword, message = null) {
         const data = await response.json();
 
         if (!data.data || !data.data.images) {
+            console.log("[GIF] Réponse de GIPHY : ", data);
             await send("Aucun GIF trouvé pour ce mot-clé. Essaie autre chose !");
             return;
         }

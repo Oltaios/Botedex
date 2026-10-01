@@ -16,7 +16,7 @@ import { getConfig } from '../../utils/configLoader.js';
 import { channelService } from '../channel/ChannelService.js';
 import { sendGif } from '../../utils/gif.js';
 import { parsingPkm } from '../../utils/parsing.js';
-import { setNumPkmAvailable } from '../../core/client.js';
+import { clearTentativesCapture, setLockPkmAvailable, setNumPkmAvailable } from '../../core/client.js';
 import { PhrasesAleatoires } from '../../utils/phrasesAleatoires.js';
 
 export class SpawnService {
@@ -30,6 +30,10 @@ export class SpawnService {
             "Alerte : un {nomPoke} [{numPkm}] rôde dans le coin...",
             "Un {nomPoke} [{numPkm}] débarque sans prévenir, montrez-lui de quel Fanta vous vous chauffez !",
             "Tremblez, mortels : {nomPoke} [{numPkm}] vient d'apparaître !"
+        ], [
+            "Il n'est peut-être pas digne de CONSORT RADAHN, mais il a le mérite d'apparaître sous votre nez, voici {nomPoke} [{numPkm}] !",
+            "Celui-là mériterait sûrement un @pin all, mais un seul dresseur pourra l'attraper de toute façon, {nomPoke} [{numPkm}] entre en jeu !",
+            "Il ne s'est pas remis de sa dernière soirée, mais {nomPoke} [{numPkm}] est vaillant !"
         ]);
         this.appelsCapture = new PhrasesAleatoires([
             `Lancez **!capture** pour tenter de le seques... de le capturer !`,
@@ -102,6 +106,8 @@ export class SpawnService {
         const captureRate = arrayParsingPkm[1];
         console.log("[SPAWN] NOM : " + nomPoke + " avec un taux de capture de " + captureRate);
         setNumPkmAvailable(randomNumPkm);
+        setLockPkmAvailable(0);
+        clearTentativesCapture(); // Nouveau Pokémon : repart de zéro sur les tentatives
         channelService.sendMessage(this.annoncesSpawn.piocher({ nomPoke, numPkm: randomNumPkm }))
 
         //utilisation de @pokemon pour cibler des stickers generes par le compte officiel de Pokemon sur Giphy

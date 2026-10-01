@@ -24,7 +24,7 @@ abilities,against_bug,against_dark,against_dragon,against_electric,against_fairy
 "['Intimidate', 'Shed Skin', 'Unnerve']",0.5,1,1,1,0.5,0.5,1,1,1,0.5,2,1,1,0.5,2,1,1,1,60,5120,70,288,255,Snake Pokémon,44,1000000,2.0,35,Arboアーボ,Ekans,50,23,40,54,55,poison,,6.9,1,0
 "['Intimidate', 'Shed Skin', 'Unnerve']",0.5,1,1,1,0.5,0.5,1,1,1,0.5,2,1,1,0.5,2,1,1,1,95,5120,70,448,90,Cobra Pokémon,69,1000000,3.5,60,Arbokアーボック,Arbok,50,24,65,79,80,poison,,65.0,1,0
 "['Static', 'Lightningrod']",1,1,1,0.5,1,1,1,0.5,1,1,2,1,1,1,1,1,0.5,1,55,2560,70,320,190,Mouse Pokémon,40,1000000,0.4,35,Pikachuピカチュウ,Pikachu,50,25,50,50,90,electric,,6.0,1,0
-"['Static', 'Lightningrod', 'Surge Surfer']",1,1,1,0.5,1,1,1,0.5,1,1,2,1,1,1,1,1,0.5,1,85,2560,70,485,75,Mouse Pokémon,50,1000000,,60,Raichuライチュウ,Raichu,50,26,95,85,110,electric,electric,,1,0
+"['Static', 'Lightningrod', 'Surge Surfer']",1,1,1,0.5,1,1,1,0.5,1,1,2,1,1,1,1,1,0.5,1,85,2560,70,485,75,Mouse Pokémon,50,1000000,,60,Raichuライチュウ,Raichu,50,26,95,85,110,electric,,,1,0
 "['Sand Veil', 'Sand Rush', 'Snow Cloak', 'Slush Rush']",1,1,1,0,1,1,1,1,1,2,1,2,1,0.5,1,0.5,1,2,75,5120,70,300,255,Mouse Pokémon,90,1000000,,50,Sandサンド,Sandshrew,50,27,10,35,40,ground,ice,,1,0
 "['Sand Veil', 'Sand Rush', 'Snow Cloak', 'Slush Rush']",1,1,1,0,1,1,1,1,1,2,1,2,1,0.5,1,0.5,1,2,100,5120,70,450,90,Mouse Pokémon,120,1000000,,75,Sandpanサンドパン,Sandslash,50,28,25,65,65,ground,ice,,1,0
 "['Poison Point', 'Rivalry', 'Hustle']",0.5,1,1,1,0.5,0.5,1,1,1,0.5,2,1,1,0.5,2,1,1,1,47,5120,70,275,235,Poison Pin Pokémon,52,1059860,0.4,55,Nidoran?ニドラン♀,Nidoran (Femelle),0,29,40,40,41,poison,,7.0,1,0

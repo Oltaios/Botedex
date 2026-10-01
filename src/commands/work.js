@@ -17,12 +17,18 @@ import { channelService } from '../services/channel/ChannelService.js';
  */
 export async function execute(message) {
     const dresseurId = message.author.id;
-    const started = await workService.startWork(dresseurId);
+    const started = await workService.startWork(dresseurId, message);
+    // Timestamp de fin (secondes) pour le formatage Discord <t:...:R>
+    const endWorkTime = await workService.getWorkEndTimestamp(dresseurId);
 
     if (started) {
-        await channelService.replySafe(message, "⛏️ Tu commences à travailler... Reviens dans 1 heure pour récupérer ta paye !");
+        await channelService.replySafe(message, `⛏️ Tu commences à travailler... Fin du chantier <t:${endWorkTime}:R>, ta paye arriveras par pigeon voyageur mamène on fait ça bien.`);
+    } else if (endWorkTime !== null) {
+        await channelService.replySafe(message, `⏳ T'es déjà au travail, patience l'artiste ! Fin du chantier <t:${endWorkTime}:R>.`);
     } else {
-        await channelService.replySafe(message, "⏳ T'es déjà au travail, patience mon gars !");
+        // Ancien dresseur sans workStartTime : pas d'info de fin exploitable
+        //A supprimer plus tard
+        await channelService.replySafe(message, `⏳ T'es déjà au travail, patience l'artiste !`);
     }
 }
 
