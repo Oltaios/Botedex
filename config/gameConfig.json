@@ -38,6 +38,6 @@
     }
   },
   "release": {
-    "notes": "📝 Patch note\n\n✨ Features :\n- Rework capture :\n\n  -Ajout lock de capture réel (Le doublon peut exister, mais jouez au loto plutôt) **@Soon**\n  -Tentative de capture unique par dresseur (la tentative est comptabilisée au lancement de la ball) **@Soon** + **@Sharoah**\n  -Ajout phrases aléatoires shiny avec des réfs pour le spawn des Pokémons **@Khearue**\n  -Message de suspens pendant une capture\n  -Affichage du score de RNG avec message en fonction **@Khearue**\n\n- QOL : Ajout message délai restant pour la fin du !work **@Sharoah**\n- !work envoie désormais un message au joueur (en réponse à la commande !work) quand le travail est fait\n\n🐛 Corrections :\n- Raichu était en double type électrique, ce qui faussait le !game GuessMyType **@Alombria**\n- Quand une capture spawn, si un type de pokéball choisi n'est pas en nombre suffisant dans l'inventaire la capture s'arrête. **@Alombria** "
+    "notes": "🔧 Hotfix :\n\n- Le message « Ça dort ici, temps écoulé ! » n'apparaît plus pendant le lancer d'une capture. De plus, quand le dresseur choisit sa ball, le timer de réponse est désormais réinitialisé."
   }
 }

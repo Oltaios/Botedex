@@ -73,12 +73,13 @@ export class CaptureService {
             collector.on("collect", async (ballChoiceMessage) => {
                 if (captureDone) return;
                 captureDone = true;
+                collector.resetTimer();
                 console.log("[CAPTURE] Type de ball à utiliser = " + ballChoiceMessage.content.slice(1));
 
                 if(await bddService.tryToLoseBall(ballChoiceMessage.author.id, ballChoiceMessage.content.slice(1)) == 0){
                     //L'utilisateur a pu utiliser une ball, son essai est consommé
                     await addTentativesCapture(message.author.id);
-                    
+                    collector.resetTimer();
                     const reussiteCapture = await this.capture(message.author.id, pokemonAvailable[1], ballChoiceMessage.content.slice(1), pokemonAvailable[0], numPkm, message);
                     
                     //Le lancer a pu être effectué, succès ou échec à contrôler
