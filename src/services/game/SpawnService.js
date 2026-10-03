@@ -103,16 +103,17 @@ export class SpawnService {
 
         const randomNumPkm = Math.floor(Math.random() * this.config.game.numberOfPokemon) + 1;
         const arrayParsingPkm = parsingPkm(randomNumPkm);
-        const nomPoke = arrayParsingPkm[0];
+        const nomPokeENG = arrayParsingPkm[0];
         const captureRate = arrayParsingPkm[1];
-        console.log("[SPAWN] NOM : " + nomPoke + " avec un taux de capture de " + captureRate);
+        const nomPokeFR = arrayParsingPkm[2];
+        console.log("[SPAWN] NOM : " + nomPokeFR + " avec un taux de capture de " + captureRate);
         setNumPkmAvailable(randomNumPkm);
         setLockPkmAvailable(0);
         clearTentativesCapture(); // Nouveau Pokémon : repart de zéro sur les tentatives
-        channelService.sendMessage(this.annoncesSpawn.piocher({ nomPoke, numPkm: randomNumPkm }))
+        channelService.sendMessage(this.annoncesSpawn.piocher({ nomPoke: nomPokeFR, numPkm: randomNumPkm }))
 
         //utilisation de @pokemon pour cibler des stickers generes par le compte officiel de Pokemon sur Giphy
-        await sendGif(nomPoke + " @pokemon");
+        await sendGif(nomPokeENG + " @pokemon");
         // TODO: Intégrer avec la logique de capture
         // Exemple: Demander si un utilisateur veut capturer le Pokémon
         channelService.sendMessage(this.appelsCapture.piocher());

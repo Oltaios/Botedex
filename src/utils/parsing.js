@@ -41,7 +41,7 @@ var experience_growth = 26;
 var height_m = 27;
 var hp = 28;
 var japanese_name = 29;
-var name = 30;
+var nameENG = 30;
 var percentage_male = 31;
 var pokedex_number = 32;
 var sp_attack = 33;
@@ -52,6 +52,7 @@ var type2 = 37;
 var weight_kg = 38;
 var generation = 39;
 var is_legendary = 40;
+var nameFR = 41;
 
 /**
  * Retourne le nom et le taux de capture d'un Pokemon
@@ -62,9 +63,10 @@ export function parsingPkm(id) {
     if(id != null){
         var data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
         var array = CSVToArray(data, ',');
-        const nomPoke = array[id][name]
+        const nomPokeENG = array[id][nameENG]
         const tx_capture = array[id][capture_rate]
-        return [nomPoke, tx_capture];
+        const nomPokeFR = array[id][nameFR]
+        return [nomPokeENG, tx_capture, nomPokeFR];
     }
     else{
         return null;
@@ -79,7 +81,7 @@ export function parsingPkm(id) {
 export function parsingPkmNomType1Type2(id){
     var data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
     let array = CSVToArray(data, ',');
-    let nomPoke = array[id][name]
+    let nomPoke = array[id][nameENG]
     let type_1 = array[id][type1]
     let type_2 = array[id][type2]
     //console.log("type1 " + type_1 + " type2 " + type_2)
