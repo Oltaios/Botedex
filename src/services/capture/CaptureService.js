@@ -41,12 +41,14 @@ export class CaptureService {
      * @returns {Promise<void>}
      */
     async gererEventCapture(message, responseKey){
+        // Serveur Discord : partie guildId de la clé composite des dresseurs
+        const guildId = message.guildId;
         //On vérifie qu'un pokémon est prêt à être capturé
         const numPkm = getNumPkmAvailable();
         let pokemonAvailable = parsingPkm(numPkm);
         if(pokemonAvailable != null){
             // Vérifie que le dresseur a de quoi capturer avant de lancer le flux
-            const inventory = await inventoryService.getInventory(message.author.id);
+            const inventory = await inventoryService.getInventory(guildId, message.author.id);
             const totalBalls = (inventory.pokeball || 0) + (inventory.superball || 0) + (inventory.hyperball || 0);
             if (totalBalls === 0) {
                 await channelService.replySafe(message, "🎒 Tes poches sont vides ! File au shop d'abord avec `!shop` pour t'équiper en balls, le pokémon t'attendra peut-être encore.");
@@ -57,7 +59,7 @@ export class CaptureService {
             }
 
             // Inventaire et question regroupés pour ne pinger qu'une seule fois
-            const inventoryDisplay = await inventoryService.getInventoryDisplay(message.author.id);
+            const inventoryDisplay = await inventoryService.getInventoryDisplay(guildId, message.author.id);
             await channelService.replySafe(message, inventoryDisplay + `\nQuelle pokéball veux-tu utiliser ? Exemple de réponse attendu **!pokeball**`);
             const filter = m => m.author.id === message.author.id &&
                 (m.content === '!pokeball' ||
@@ -76,7 +78,7 @@ export class CaptureService {
                 collector.resetTimer();
                 console.log("[CAPTURE] Type de ball à utiliser = " + ballChoiceMessage.content.slice(1));
 
-                if(await bddService.tryToLoseBall(ballChoiceMessage.author.id, ballChoiceMessage.content.slice(1)) == 0){
+                if(await bddService.tryToLoseBall(guildId, ballChoiceMessage.author.id, ballChoiceMessage.content.slice(1)) == 0){
                     //L'utilisateur a pu utiliser une ball, son essai est consommé
                     await addTentativesCapture(message.author.id);
                     collector.resetTimer();
@@ -92,19 +94,19 @@ export class CaptureService {
                         //On reset les flags de capture
                         setNumPkmAvailable(null);
                         setLockPkmAvailable(null);
-                        const alreadyCaptured = await bddService.alreadyCaptured(message.author.id, numPkm);
+                        const alreadyCaptured = await bddService.alreadyCaptured(guildId, message.author.id, numPkm);
                                 
                         if (alreadyCaptured) {
                             const reventeReward = this.config.economy.duplicateCaptureReward;
                             // Pokémon déjà capturé
                             await channelService.replySafe(message, `**Clic !**\nVous avez déjà capturé ce Pokémon, vous décidez de vendre ses organes à la Team Rocket et gagnez ${reventeReward}$, bien joué!`);
-                            moneyService.gainMoney(message.author.id, reventeReward);
-                            await bddService.incrementCaptureCount(message.author.id);
+                            moneyService.gainMoney(guildId, message.author.id, reventeReward);
+                            await bddService.incrementCaptureCount(guildId, message.author.id);
                              
                         } else {
                             // Nouveau Pokémon !
                             await channelService.replySafe(message, `**Clic !**\nNouveau Pokémon ! Mise à jour du Pokédex SHEEEEEEEEEEEEEESH`);
-                            await bddService.registerNewCapture(message.author.id, numPkm);
+                            await bddService.registerNewCapture(guildId, message.author.id, numPkm);
                         }
                                     
                     }
@@ -121,7 +123,7 @@ export class CaptureService {
                     // retenter un autre type dans le temps restant
                     captureDone = false;
                     // Ré-affiche l'inventaire pour guider le nouveau choix
-                    const inventoryDisplay = await inventoryService.getInventoryDisplay(ballChoiceMessage.author.id);
+                    const inventoryDisplay = await inventoryService.getInventoryDisplay(guildId, ballChoiceMessage.author.id);
                     await channelService.replySafe(ballChoiceMessage, `Vous n'avez pas assez de ce type de ball !
                     ${inventoryDisplay}`);
                 }

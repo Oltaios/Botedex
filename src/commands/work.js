@@ -17,9 +17,9 @@ import { channelService } from '../services/channel/ChannelService.js';
  */
 export async function execute(message) {
     const dresseurId = message.author.id;
-    const started = await workService.startWork(dresseurId, message);
+    const started = await workService.startWork(message.guildId, dresseurId, message);
     // Timestamp de fin (secondes) pour le formatage Discord <t:...:R>
-    const endWorkTime = await workService.getWorkEndTimestamp(dresseurId);
+    const endWorkTime = await workService.getWorkEndTimestamp(message.guildId, dresseurId);
 
     if (started) {
         await channelService.replySafe(message, `⛏️ Tu commences à travailler... Fin du chantier <t:${endWorkTime}:R>, ta paye arriveras par pigeon voyageur mamène on fait ça bien.`);

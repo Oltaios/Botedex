@@ -10,12 +10,12 @@
  *
  * Exemple d'utilisation :
  *   import { workService } from './services/economy/WorkService.js';
- *   const started = await workService.startWork(idDiscord);
+ *   const started = await workService.startWork(guildId, idDiscord, message);
  */
 
 import { bddService } from '../bdd/BDDService.js';
 import { moneyService } from './MoneyService.js';
-import { getConfig } from '../../utils/configLoader.js';
+import { getConfig, getDiscordGuildId } from '../../utils/configLoader.js';
 import { channelService } from '../channel/ChannelService.js';
 
 // Durée d'une session de travail (1 heure)
@@ -38,18 +38,20 @@ export class WorkService {
      * Fait partir un dresseur au travail
      * Planifie automatiquement la fin de la session (WORK_DURATION_MS) et
      * le versement de la paye
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
+     * @param {Object} message - Message Discord de la commande (message de fin)
      * @returns {Promise<boolean>} - true si le dresseur a pu partir travailler, false s'il travaille déjà
      */
-    async startWork(userId, message) {
-        const canWork = await bddService.userGoToWork(userId);
+    async startWork(guildId, userId, message) {
+        const canWork = await bddService.userGoToWork(guildId, userId);
         if (canWork !== 0) {
             return false;
         }
 
         // Termine la session après la durée de travail
         setTimeout(() => {
-            this.finishWork(userId).catch(console.error);
+            this.finishWork(guildId, userId).catch(console.error);
             channelService.replySafe(message, "Travail terminé ! (à lire avec une voix de peon si t'es assez vieux)")
         }, WORK_DURATION_MS);
 
@@ -61,12 +63,13 @@ export class WorkService {
      * (heure de début enregistrée + durée de session), au format timestamp
      * Unix en secondes, directement exploitable dans un formatage Discord
      * <t:...:R> (compte à rebours relatif affiché par le client)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number|null>} - Timestamp de fin en secondes, ou
      *          null si le dresseur n'a pas de session enregistrée
      */
-    async getWorkEndTimestamp(userId) {
-        const startTime = await bddService.getStartWorkTimeUser(userId);
+    async getWorkEndTimestamp(guildId, userId) {
+        const startTime = await bddService.getStartWorkTimeUser(guildId, userId);
         if (startTime === null) {
             return null;
         }
@@ -77,24 +80,32 @@ export class WorkService {
      * Termine une session de travail : verse la paye et libère le dresseur
      * Les deux mises à jour sont atomiques ($inc / $set ciblés), sans
      * réécriture du document complet
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number>} - Montant de la récompense versée
      */
-    async finishWork(userId) {
+    async finishWork(guildId, userId) {
         const reward = this.getWorkReward();
-        await moneyService.gainMoney(userId, reward);
-        await bddService.updateOneFieldForOneUser(userId, 'isWorking', 0);
+        await moneyService.gainMoney(guildId, userId, reward);
+        await bddService.updateOneFieldForOneUser(guildId, userId, 'isWorking', 0);
         return reward;
     }
 
     /**
-     * Réinitialise le statut de travail de tous les dresseurs
-     * À appeler au démarrage du bot : les sessions planifiées par startWork
-     * sont perdues lors d'un redémarrage, il faut donc libérer les dresseurs
+     * Réinitialise le statut de travail des dresseurs du serveur de cette
+     * instance (DISCORD_GUILD_ID). À appeler au démarrage du bot : les
+     * sessions planifiées par startWork sont perdues lors d'un redémarrage,
+     * il faut donc libérer les dresseurs. Le filtre par serveur évite qu'une
+     * instance ne libère les dresseurs suivis par une autre instance (base
+     * commune). Sans DISCORD_GUILD_ID, s'applique à toutes les guilds.
      * @returns {Promise<void>}
      */
     async resetAllWork() {
-        await bddService.resetIsWorking();
+        const guildId = getDiscordGuildId();
+        if (!guildId) {
+            console.warn('⚠️ DISCORD_GUILD_ID non défini : reset du travail appliqué à toutes les guilds');
+        }
+        await bddService.resetIsWorking(guildId);
     }
 }
 

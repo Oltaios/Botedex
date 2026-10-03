@@ -4,15 +4,22 @@
  * toutes les opérations de persistance (CRUD générique + méthodes métier
  * dédiées aux dresseurs). Aucune autre classe ne parle directement au driver.
  *
- * Schéma du document dresseur (collection 'dresseurs', _id = ID Discord) :
- *   { _id, name, argent, nbrCapture, captureAvailable, gameAvailable,
- *     isWorking, workStartTime, pokeball, superball, hyperball,
+ * Isolation multi-serveurs : les dresseurs sont isolés par serveur Discord
+ * via une clé composite _id = { guildId, userId }. Un même dresseur Discord
+ * possède un document distinct sur chaque serveur, tous dans la même
+ * collection. La clé est TOUJOURS construite par #dresseurId() : une
+ * recherche par égalité sur un sous-document _id ne matche que si l'ordre
+ * des champs est identique.
+ *
+ * Schéma du document dresseur (collection 'dresseurs') :
+ *   { _id: { guildId, userId }, name, argent, nbrCapture, captureAvailable,
+ *     gameAvailable, isWorking, workStartTime, pokeball, superball, hyperball,
  *     '<numéroPokémon>' (1-151): 0|1, ... }
  *
  * Utilisation :
  *   import { bddService } from './services/bdd/BDDService.js';
  *   await bddService.init();
- *   const dresseur = await bddService.readOperation('dresseurs', idDiscord);
+ *   const dresseur = await bddService.getDresseur(guildId, idDiscord);
  */
 
 import { MongoClient } from 'mongodb';
@@ -23,6 +30,7 @@ export class BDDService {
     #client = null;
     #initialized = false;
     #dbConfig = null;
+    #dresseursCollection = 'dresseurs'; // Nom résolu depuis database.json
 
     constructor() {
         if (BDDService.#instance) {
@@ -30,6 +38,7 @@ export class BDDService {
         }
         BDDService.#instance = this;
         this.#dbConfig = getDatabaseConfig();
+        this.#dresseursCollection = this.#dbConfig.collections?.dresseurs || 'dresseurs';
     }
 
     /**
@@ -87,7 +96,8 @@ export class BDDService {
     /**
      * Lit un document par son _id
      * @param {string} collection - Nom de la collection
-     * @param {string} id - Valeur du champ _id (ID Discord pour les dresseurs)
+     * @param {string|Object} id - Valeur du champ _id (clé composite
+     *        { guildId, userId } pour les dresseurs, cf. #dresseurId)
      * @returns {Promise<Object|null>} - Document trouvé, ou null si inexistant
      */
     async readOperation(collection, id) {
@@ -120,29 +130,53 @@ export class BDDService {
         return result.deletedCount;
     }
 
-    // ========== MÉTHODES SPÉCIFIQUES À TON BOT ==========
+    // ========== DRESSEURS (CLÉ COMPOSITE { guildId, userId }) ==========
+
+    /**
+     * Construit la clé composite d'un dresseur
+     * Toujours passer par ce helper : une recherche par égalité sur un
+     * sous-document _id ne matche que si l'ordre des champs est identique
+     * @param {string} guildId - ID du serveur Discord
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {{guildId: string, userId: string}} - Clé _id du document dresseur
+     */
+    #dresseurId(guildId, userId) {
+        return { guildId, userId };
+    }
+
+    /**
+     * Lit le document d'un dresseur par sa clé composite
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<Object|null>} - Document trouvé, ou null si inexistant
+     */
+    async getDresseur(guildId, userId) {
+        return await this.readOperation(this.#dresseursCollection, this.#dresseurId(guildId, userId));
+    }
 
     /**
      * Vérifie si un Pokémon est déjà capturé par un dresseur
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {number} numPkm - Numéro du Pokémon (clé du champ dans le document)
      * @returns {Promise<boolean>}
      */
-    async alreadyCaptured(userId, numPkm) {
-        const row = await this.readOperation('dresseurs', userId);
+    async alreadyCaptured(guildId, userId, numPkm) {
+        const row = await this.getDresseur(guildId, userId);
         return row && row[numPkm] === 1;
     }
 
     /**
      * Enregistre une nouvelle capture : marque le Pokémon comme capturé et
      * incrémente le compteur de captures, en une seule opération atomique
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {number} numPkm - Numéro du Pokémon capturé
      * @returns {Promise<void>}
      */
-    async registerNewCapture(userId, numPkm) {
-        await this.db.collection('dresseurs').updateOne(
-            { _id: userId },
+    async registerNewCapture(guildId, userId, numPkm) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
             { $set: { [numPkm]: 1 }, $inc: { nbrCapture: 1 } }
         );
     }
@@ -150,71 +184,80 @@ export class BDDService {
     /**
      * Incrémente le compteur de captures d'un dresseur, sans toucher au
      * Pokédex (utilisé pour les doublons capturés puis revendus)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<void>} - Sans effet si le dresseur n'existe pas
      */
-    async incrementCaptureCount(userId) {
-        await this.db.collection('dresseurs').updateOne(
-            { _id: userId },
+    async incrementCaptureCount(guildId, userId) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
             { $inc: { nbrCapture: 1 } }
         );
     }
 
     /**
-     * Vérifie si un utilisateur existe et est enregistré
+     * Vérifie si un utilisateur existe et est enregistré sur ce serveur
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord de l'utilisateur
      * @returns {Promise<boolean>}
      */
-    async validerRegleGestionUtilisateurEnregistre(userId) {
-        const row = await this.readOperation('dresseurs', userId);
+    async validerRegleGestionUtilisateurEnregistre(guildId, userId) {
+        const row = await this.getDresseur(guildId, userId);
         return row !== null;
     }
 
     /**
      * Vérifie si un champ booléen (0/1) est actif pour un dresseur
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {string} fieldToCheck - Champ à vérifier (ex: 'gameAvailable')
      * @returns {Promise<boolean>} - true si le champ vaut 1, false sinon
      */
-    async checkIfAvailable(userId, fieldToCheck) {
-        const row = await this.readOperation('dresseurs', userId);
+    async checkIfAvailable(guildId, userId, fieldToCheck) {
+        const row = await this.getDresseur(guildId, userId);
         return row && row[fieldToCheck] === 1;
     }
 
     /**
-     * Met à jour un champ pour tous les dresseurs ayant ce champ à 0
+     * Met à jour un champ pour tous les dresseurs d'un serveur ayant ce champ à 0
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
      * @param {string} fieldToUpdate - Champ à mettre à jour
      * @param {number} value - Nouvelle valeur
      * @returns {Promise<void>}
      */
-    async updateMany(fieldToUpdate, value) {
-        const filter = { [fieldToUpdate]: 0 };
+    async updateMany(guildId, fieldToUpdate, value) {
+        const filter = guildId
+            ? { '_id.guildId': guildId, [fieldToUpdate]: 0 }
+            : { [fieldToUpdate]: 0 };
         const update = { $set: { [fieldToUpdate]: value } };
-        await this.db.collection('dresseurs').updateMany(filter, update);
+        await this.db.collection(this.#dresseursCollection).updateMany(filter, update);
     }
 
     /**
      * Met à jour un champ pour un dresseur spécifique
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {string} fieldToUpdate - Champ à mettre à jour
      * @param {number} value - Nouvelle valeur
      * @returns {Promise<void>}
      */
-    async updateOneFieldForOneUser(userId, fieldToUpdate, value) {
-        const filter = { _id: userId };
+    async updateOneFieldForOneUser(guildId, userId, fieldToUpdate, value) {
+        const filter = { _id: this.#dresseurId(guildId, userId) };
         const update = { $set: { [fieldToUpdate]: value } };
-        await this.db.collection('dresseurs').updateOne(filter, update);
+        await this.db.collection(this.#dresseursCollection).updateOne(filter, update);
     }
 
     /**
      * Ajoute de l'argent à un dresseur (incrément atomique)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {number} amount - Montant à ajouter
      * @returns {Promise<void>} - Sans effet si le dresseur n'existe pas
      */
-    async gainMoney(userId, amount) {
-        await this.db.collection('dresseurs').updateOne(
-            { _id: userId },
+    async gainMoney(guildId, userId, amount) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
             { $inc: { argent: amount } }
         );
     }
@@ -223,13 +266,14 @@ export class BDDService {
      * Retire une ball à un dresseur (décrément atomique)
      * La condition de stock est dans le filtre : impossible de décompter
      * deux balls en même temps alors qu'il n'en reste qu'une
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {string} ballType - Type de ball ('pokeball', 'superball', 'hyperball')
      * @returns {Promise<number>} - 0 si succès, 1 si stock insuffisant
      */
-    async tryToLoseBall(userId, ballType) {
-        const result = await this.db.collection('dresseurs').updateOne(
-            { _id: userId, [ballType]: { $gt: 0 } },
+    async tryToLoseBall(guildId, userId, ballType) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId), [ballType]: { $gt: 0 } },
             { $inc: { [ballType]: -1 } }
         );
         if (result.matchedCount === 0) {
@@ -242,15 +286,16 @@ export class BDDService {
     /**
      * Achat de balls atomique : débite le prix et crédite les balls
      * en une seule opération indivisible
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {string} ballType - Type de ball ('pokeball', 'superball', 'hyperball')
      * @param {number} quantity - Nombre de balls achetées (>= 1)
      * @param {number} totalPrice - Prix total à débiter
      * @returns {Promise<number>} - 0 si achat effectué, 1 si solde insuffisant
      */
-    async purchaseBalls(userId, ballType, quantity, totalPrice) {
-        const result = await this.db.collection('dresseurs').updateOne(
-            { _id: userId, argent: { $gte: totalPrice } },
+    async purchaseBalls(guildId, userId, ballType, quantity, totalPrice) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId), argent: { $gte: totalPrice } },
             { $inc: { argent: -totalPrice, [ballType]: quantity } }
         );
         return result.matchedCount === 0 ? 1 : 0;
@@ -259,13 +304,14 @@ export class BDDService {
     /**
      * Crée un nouveau dresseur avec les valeurs par défaut
      * Pré-remplit tous les Pokémon (1 à 151) comme non capturés
-     * @param {string} idUser - ID Discord de l'utilisateur (devient le _id)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} idUser - ID Discord de l'utilisateur (partie userId de la clé _id)
      * @param {string} username - Nom d'affichage Discord de l'utilisateur
      * @returns {Promise<void>}
      */
-    async createNewUser(idUser, username) {
+    async createNewUser(guildId, idUser, username) {
         const row = {
-            _id: idUser,
+            _id: this.#dresseurId(guildId, idUser),
             name: username,
             argent: 500,
             nbrCapture: 0,
@@ -281,7 +327,7 @@ export class BDDService {
         for (let i = 1; i <= 151; i++) {
             row[i] = 0;
         }
-        await this.createOperation('dresseurs', row);
+        await this.createOperation(this.#dresseursCollection, row);
     }
 
     /**
@@ -290,12 +336,13 @@ export class BDDService {
      * ne peuvent pas tous deux réserver le dresseur
      * Enregistre l'heure de début de session (workStartTime) pour
      * permettre le calcul du temps restant
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number>} - 0 si possible, 1 s'il travaille déjà (ou n'existe pas)
      */
-    async userGoToWork(userId) {
-        const result = await this.db.collection('dresseurs').updateOne(
-            { _id: userId, isWorking: 0 },
+    async userGoToWork(guildId, userId) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId), isWorking: 0 },
             { $set: { isWorking: 1, workStartTime: Date.now() } }
         );
         return result.matchedCount === 0 ? 1 : 0; // Peut travailler
@@ -305,13 +352,14 @@ export class BDDService {
      * Retourne l'heure de début de session de travail d'un dresseur
      * Projection sur le seul champ workStartTime : évite de charger
      * tout le document (151 champs Pokédex) pour une simple lecture
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number|null>} - Timestamp de début en ms, ou null
      *          si le dresseur n'existe pas / n'a jamais travaillé
      */
-    async getStartWorkTimeUser(userId) {
-        const row = await this.db.collection('dresseurs').findOne(
-            { _id: userId },
+    async getStartWorkTimeUser(guildId, userId) {
+        const row = await this.db.collection(this.#dresseursCollection).findOne(
+            { _id: this.#dresseurId(guildId, userId) },
             { projection: { _id: 0, workStartTime: 1 } }
         );
         // ?? null normalise undefined (champ absent) en null : le contrat
@@ -321,32 +369,35 @@ export class BDDService {
 
     /**
      * Retourne l'argent d'un dresseur
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number>} - 0 si le dresseur n'existe pas
      */
-    async getMoneyForUser(userId) {
-        const row = await this.readOperation('dresseurs', userId);
+    async getMoneyForUser(guildId, userId) {
+        const row = await this.getDresseur(guildId, userId);
         return row ? row.argent : 0;
     }
 
     /**
      * Retourne le stock de balls d'un dresseur
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<Array<number>>} - [pokeball, superball, hyperball]
      */
-    async getBallsForUser(userId) {
-        const row = await this.readOperation('dresseurs', userId);
+    async getBallsForUser(guildId, userId) {
+        const row = await this.getDresseur(guildId, userId);
         return row ? [row.pokeball, row.superball, row.hyperball] : [0, 0, 0];
     }
 
     /**
      * Retourne le nombre de Pokémon capturés par un dresseur
      * (compte les champs Pokémon 1 à 151 valant 1)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number>} - 0 si le dresseur n'existe pas
      */
-    async getPokedexStateForUser(userId) {
-        const row = await this.readOperation('dresseurs', userId);
+    async getPokedexStateForUser(guildId, userId) {
+        const row = await this.getDresseur(guildId, userId);
         if (!row) return 0;
         let count = 0;
         for (let i = 1; i <= 151; i++) {
@@ -357,31 +408,41 @@ export class BDDService {
 
     /**
      * Consomme le jeton de jeu quotidien d'un dresseur
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<void>}
      */
-    async consumeGameAvailable(userId) {
-        await this.updateOneFieldForOneUser(userId, 'gameAvailable', 0);
+    async consumeGameAvailable(guildId, userId) {
+        await this.updateOneFieldForOneUser(guildId, userId, 'gameAvailable', 0);
     }
 
     /**
-     * Réinitialise les jetons de jeu pour tous les dresseurs (mise à 1)
+     * Réinitialise les jetons de jeu des dresseurs d'un serveur (mise à 1)
      * Appelé à minuit via GameService.startDailyResetSchedule()
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
      * @returns {Promise<void>}
      */
-    async resetGameAvailable() {
-        await this.updateMany('gameAvailable', 1);
+    async resetGameAvailable(guildId) {
+        await this.updateMany(guildId, 'gameAvailable', 1);
         console.log("Reset des tokens game effectué");
     }
 
     /**
-     * Réinitialise le statut de travail de tous les dresseurs (mise à 0)
+     * Réinitialise le statut de travail des dresseurs d'un serveur (mise à 0)
      * Appelé au démarrage du bot via WorkService.resetAllWork() : les sessions
-     * planifiées en mémoire sont perdues au redémarrage, il faut libérer tout le monde
+     * planifiées en mémoire sont perdues au redémarrage, il faut libérer tout le monde.
+     * Le filtre par serveur est indispensable en multi-instances : sans lui, un
+     * redémarrage libérerait aussi les dresseurs suivis par les autres instances.
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
      * @returns {Promise<void>}
      */
-    async resetIsWorking() {
-        await this.db.collection('dresseurs').updateMany({ isWorking: 1 }, { $set: { isWorking: 0 } });
+    async resetIsWorking(guildId) {
+        const filter = guildId
+            ? { '_id.guildId': guildId, isWorking: 1 }
+            : { isWorking: 1 };
+        await this.db.collection(this.#dresseursCollection).updateMany(filter, { $set: { isWorking: 0 } });
     }
 }
 

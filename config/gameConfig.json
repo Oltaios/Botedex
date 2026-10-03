@@ -38,6 +38,6 @@
     }
   },
   "release": {
-    "notes": "🔧 Hotfix :\n\n- Le message « Ça dort ici, temps écoulé ! » n'apparaît plus pendant le lancer d'une capture. De plus, quand le dresseur choisit sa ball, le timer de réponse est désormais réinitialisé."
+    "notes": "🔧 Changement technique :\n\n- Désormais la progression de chaque dresseur est isolée entre chaque serveur Discord. Cela permet une équité pour l'ensemble des joueurs sur les classements qui arriveront prochainement."
   }
 }

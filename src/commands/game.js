@@ -30,7 +30,7 @@ export async function execute(message) {
     const channel = message.channel;
 
     // Vérifie si le jeu est disponible pour l'utilisateur
-    const gameAvailable = await bddService.checkIfAvailable(dresseurId, 'gameAvailable');
+    const gameAvailable = await bddService.checkIfAvailable(message.guildId, dresseurId, 'gameAvailable');
     
     if (gameAvailable) {
         // TODO: Intégrer avec gameService
@@ -71,12 +71,12 @@ export async function execute(message) {
 
             // Le jeton est consommé dès la première réponse, gagnant ou perdant
             if (collector.collected.size === 1) {
-                await bddService.consumeGameAvailable(dresseurId);
+                await bddService.consumeGameAvailable(message.guildId, dresseurId);
             }
 
             if (expectedAnswers.includes(answer)) {
                 await collected.reply(`🎉 You found it ! Well played ! U gained ${reward} pokédollars !`);
-                await moneyService.gainMoney(dresseurId, reward);
+                await moneyService.gainMoney(message.guildId, dresseurId, reward);
                 collector.stop();
                 return;
             }

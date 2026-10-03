@@ -35,7 +35,7 @@ export async function execute(message, pendingResponses) {
         new Ball('hyperball')
     ];
 
-    const moneyAvailable = await bddService.getMoneyForUser(currentUserId);
+    const moneyAvailable = await bddService.getMoneyForUser(message.guildId, currentUserId);
     
     let messageInventoryShop = "🏪 **Bienvenue au Shop de Netto !**\n\n";
     messageInventoryShop += `💰 Tu as ${moneyAvailable}$\n`
@@ -88,12 +88,12 @@ export async function execute(message, pendingResponses) {
         
         // Achat atomique : débit et crédit des balls sont indivisibles,
         // le filtre garantit que le solde suffit au moment même de l'opération
-        const purchase = await bddService.purchaseBalls(currentUserId, ballTypeToBuy, nbrBallToBuy, totalPrice);
+        const purchase = await bddService.purchaseBalls(message.guildId, currentUserId, ballTypeToBuy, nbrBallToBuy, totalPrice);
         if (purchase !== 0) {
             // Répond au message d'achat : c'est une réaction directe à ce qu'il vient de taper
             await channelService.replySafe(collected, "💸 T'as pas un kopek minot dégage de là");
         } else {
-            const newBalance = await bddService.getMoneyForUser(currentUserId);
+            const newBalance = await bddService.getMoneyForUser(message.guildId, currentUserId);
 
             // Résumé de l'opération en sortie de shop
             await collected.reply(

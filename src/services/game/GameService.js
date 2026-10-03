@@ -9,7 +9,7 @@
  */
 
 import { bddService } from '../bdd/BDDService.js';
-import { getConfig } from '../../utils/configLoader.js';
+import { getConfig, getDiscordGuildId } from '../../utils/configLoader.js';
 import schedule from 'node-schedule';
 
 export class GameService {
@@ -18,11 +18,17 @@ export class GameService {
     }
 
     /**
-     * Réinitialise les jetons de jeu pour tous les dresseurs
+     * Réinitialise les jetons de jeu des dresseurs du serveur de cette
+     * instance (DISCORD_GUILD_ID). Sans DISCORD_GUILD_ID, s'applique à
+     * toutes les guilds (mono-serveur).
      * @returns {Promise<void>}
      */
     async resetAllGameTokens() {
-        await bddService.resetGameAvailable();
+        const guildId = getDiscordGuildId();
+        if (!guildId) {
+            console.warn('⚠️ DISCORD_GUILD_ID non défini : reset des jetons de jeu appliqué à toutes les guilds');
+        }
+        await bddService.resetGameAvailable(guildId);
     }
 
     /**

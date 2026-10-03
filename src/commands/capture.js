@@ -8,7 +8,7 @@
  */
 
 import { captureService } from '../services/capture/CaptureService.js';
-import { pendingResponses, getLockPkmAvailable, setLockPkmAvailable, getTentativesCapture } from '../core/client.js';
+import { pendingResponses, getLockPkmAvailable, setLockPkmAvailable, getTentativesCapture, getNumPkmAvailable } from '../core/client.js';
 import { channelService } from '../services/channel/ChannelService.js';
 
 /**
@@ -20,7 +20,7 @@ import { channelService } from '../services/channel/ChannelService.js';
 export async function execute(message) {
     if (!metadata.adminOnly) {
 
-        if(getTentativesCapture() !== null && getTentativesCapture().has(message.author.id)){
+        if(getTentativesCapture() !== null && getTentativesCapture().has(message.author.id) && getNumPkmAvailable !== null){
             await channelService.replySafe(message, "C'est le genre d'occasion qu'on a qu'une seule fois dans une vie, tu décides de laisser la place aux autres...");
             return;
         }
