@@ -52,13 +52,13 @@ export async function handle(message) {
     
     // 5. Commande d'enregistrement
     if (message.content === '!jeVeuxJouerStpCreeMoiUnComptePourquoiCetteCommandeEstSiLongueJeHaisLesDevs') {
-        const existe = await bddService.validerRegleGestionUtilisateurEnregistre(message.author.id);
+        const existe = await bddService.validerRegleGestionUtilisateurEnregistre(message.guildId, message.author.id);
         if (existe) {
             await channelService.replySafe(message, "User already exists tu me prends pour un artichaut ?");
         } else {
             await channelService.replySafe(message, "Wanna create an account, if you used ctrl-c + ctrl-v to enter the command u'll find Magikarp only");
             try {
-                await bddService.createNewUser(message.author.id, message.author.username);
+                await bddService.createNewUser(message.guildId, message.author.id, message.author.username);
                 await channelService.replySafe(message, `Compte créé ! Tu peux accéder aux différentes commandes via **!help**`);
             } catch (error) {
                 console.error('❌ Erreur lors de la création de l\'utilisateur:', error);
@@ -70,7 +70,7 @@ export async function handle(message) {
 
     // 6. Commandes nécessitant un utilisateur enregistré
     if (message.content.startsWith('!')) {
-        const isRegistered = await bddService.validerRegleGestionUtilisateurEnregistre(message.author.id);
+        const isRegistered = await bddService.validerRegleGestionUtilisateurEnregistre(message.guildId, message.author.id);
 
         if (!isRegistered) {
             await channelService.replySafe(message, "Tu n'apparais pas dans les utilisateurs enregistrés, un petit coup de !jeVeuxJouerStpCreeMoiUnComptePourquoiCetteCommandeEstSiLongueJeHaisLesDevs semble s'imposer");

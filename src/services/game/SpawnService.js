@@ -33,13 +33,14 @@ export class SpawnService {
         ], [
             "Il n'est peut-être pas digne de CONSORT RADAHN, mais il a le mérite d'apparaître sous votre nez, voici {nomPoke} [{numPkm}] !",
             "Celui-là mériterait sûrement un @pin all, mais un seul dresseur pourra l'attraper de toute façon, {nomPoke} [{numPkm}] entre en jeu !",
-            "Il ne s'est pas remis de sa dernière soirée, mais {nomPoke} [{numPkm}] est vaillant !"
+            "Il ne s'est pas remis de sa dernière soirée, mais {nomPoke} [{numPkm}] est vaillant !",
+            "Un {nomPoke} [{numPkm}] vient d'apparaître...Mais à quoi bon ? Sharoah ou Alombria sont sûrement co..."
         ]);
         this.appelsCapture = new PhrasesAleatoires([
             `Lancez **!capture** pour tenter de le seques... de le capturer !`,
             `Tapez **!capture** avant qu'il ne décampe !`,
             `Un petit **!capture**, ça vous tente ? Il ne se capturera pas tout seul.`,
-            `**!capture** maintenant, ou pleurez plus tard.`
+            `**!capture** maintenant, ou pleure plus tard.`
         ]);
     }
 

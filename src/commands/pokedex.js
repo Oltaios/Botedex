@@ -16,7 +16,7 @@ import { bddService } from '../services/bdd/BDDService.js';
  */
 export async function execute(message) {
     const dresseurId = message.author.id;
-    const result = await bddService.getPokedexStateForUser(dresseurId);
+    const result = await bddService.getPokedexStateForUser(message.guildId, dresseurId);
     await message.reply(`**Bip bip bip** Nombre de pokémons capturés : ${result} **Bip bip bip**`);
 }
 

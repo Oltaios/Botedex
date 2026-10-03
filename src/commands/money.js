@@ -17,7 +17,7 @@ import { channelService } from '../services/channel/ChannelService.js';
  */
 export async function execute(message) {
     const dresseurId = message.author.id;
-    const moneyAvailable = await bddService.getMoneyForUser(dresseurId);
+    const moneyAvailable = await bddService.getMoneyForUser(message.guildId, dresseurId);
     await channelService.replySafe(message, `💰 Tu as ${moneyAvailable}$`);
 }
 

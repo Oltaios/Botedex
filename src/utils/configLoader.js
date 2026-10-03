@@ -69,3 +69,17 @@ export function getDatabaseConfig() {
         };
     }
 }
+
+
+/**
+ * Retourne l'ID du serveur Discord servi par cette instance (DISCORD_GUILD_ID).
+ * Utilisé pour les opérations d'instance sans contexte de message (reset
+ * quotidien des jetons de jeu, libération du travail au démarrage) : avec la
+ * clé composite { guildId, userId }, chaque instance ne réinitialise que les
+ * dresseurs de son serveur, même avec une base de données commune.
+ * @returns {string|null} - ID du serveur, ou null si non défini
+ *          (mono-serveur : les opérations s'appliquent alors à toutes les guilds)
+ */
+export function getDiscordGuildId() {
+    return process.env.DISCORD_GUILD_ID || null;
+}

@@ -17,7 +17,7 @@ import { channelService } from '../services/channel/ChannelService.js';
  */
 export async function execute(message) {
     const dresseurId = message.author.id;
-    const ballsAvailable = await bddService.getBallsForUser(dresseurId);
+    const ballsAvailable = await bddService.getBallsForUser(message.guildId, dresseurId);
     
     let toPrint = "🎒 Ce qui se trouve dans tes poches : \n";
     toPrint += `pokeball : ${ballsAvailable[0]}\n`;
