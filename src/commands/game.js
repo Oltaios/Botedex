@@ -100,7 +100,7 @@ export async function execute(message) {
             pendingResponses.delete(responseKey); // Libère la clé
         });
     } else {
-        await message.reply("🌙 Jeu non disponible, il faut attendre minuit ! Espèce de drogué.");
+        await message.reply("❌ Jeu non disponible, il faut attendre le début de la prochaine heure ! Espèce de drogué.");
     }
 }
 
