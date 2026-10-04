@@ -93,6 +93,14 @@ test('commandes réservées : refus si non enregistré, accès sinon', async () 
     assert.ok(inscrit.replies.some((r) => String(r).includes('500')), 'solde initial affiché');
 });
 
+test('!pokedex renvoie le compte et le lien de checklist LivingDex', async () => {
+    const message = fakeMessage({ authorId: 'u-inscrit', guildId: GUILD, content: '!pokedex' });
+    await handle(message);
+    const reply = String(message.replies[0] ?? '');
+    assert.ok(reply.includes('capturés : 0'), 'compte de captures');
+    assert.ok(reply.includes('https://livingdex.app/?game=rby#s='), 'lien LivingDex autoporteur');
+});
+
 test('isolation : enregistré sur un serveur ne l\'est pas sur un autre', async () => {
     const message = fakeMessage({ authorId: 'u-inscrit', guildId: 'guild-autre', content: '!money' });
     await handle(message);

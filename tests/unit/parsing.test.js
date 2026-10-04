@@ -71,7 +71,26 @@ test('name reste anglais et nameFR français (échantillon de garde)', () => {
     }
 });
 
-test('contrat parsingPkmNomType1Type2 : nom EN et types', () => {
-    assert.deepEqual(parsingPkmNomType1Type2(25), { nomPoke: 'Pikachu', type_1: 'electric', type_2: '' });
-    assert.deepEqual(parsingPkmNomType1Type2(6), { nomPoke: 'Charizard', type_1: 'fire', type_2: 'flying' });
+test('contrat parsingPkmNomType1Type2 : nom EN et types FR', () => {
+    assert.deepEqual(parsingPkmNomType1Type2(25), { nomPoke: 'Pikachu', type_1: 'electrik', type_2: '' });
+    assert.deepEqual(parsingPkmNomType1Type2(6), { nomPoke: 'Charizard', type_1: 'feu', type_2: 'vol' });
+});
+
+test('types du CSV : 18 types français, aucun reste anglais', () => {
+    const attendus = new Set([
+        'normal', 'feu', 'eau', 'electrik', 'plante', 'glace', 'combat', 'poison',
+        'sol', 'vol', 'psy', 'insecte', 'roche', 'spectre', 'dragon', 'tenebres',
+        'acier', 'fee'
+    ]);
+    const vus = new Set();
+    const lines = lignes();
+    for (let i = 1; i <= NB_POKEMON; i++) {
+        const fields = champs(lines[i]);
+        if (fields[36]) vus.add(fields[36]);
+        if (fields[37]) vus.add(fields[37]);
+    }
+    for (const type of vus) {
+        assert.ok(attendus.has(type), `type inattendu dans le CSV : "${type}" (reste anglais ?)`);
+    }
+    assert.equal(vus.size, attendus.size, 'les 18 types doivent apparaître dans la génération 1');
 });

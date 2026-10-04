@@ -37,4 +37,7 @@ jobs:
         run: npm ci
 
       - name: Tests
-        run: npm test
+        # Sérialisés : chaque test d'intégration démarre son propre mongod ;
+        # en parallèle sur un runner 2 vCPU, les démarrages peuvent entrer
+        # en contention et faire échouer la suite de façon aléatoire.
+        run: node --test --test-concurrency=1 tests/

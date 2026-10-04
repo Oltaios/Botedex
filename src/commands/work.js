@@ -22,7 +22,7 @@ export async function execute(message) {
     const endWorkTime = await workService.getWorkEndTimestamp(message.guildId, dresseurId);
 
     if (started) {
-        await channelService.replySafe(message, `⛏️ Tu commences à travailler... Fin du chantier <t:${endWorkTime}:R>, ta paye arriveras par pigeon voyageur mamène on fait ça bien.`);
+        await channelService.replySafe(message, `⛏️ Tu commences à travailler... Fin du chantier <t:${endWorkTime}:R>, ta paye arrivera par pigeon voyageur mamène on fait ça bien.`);
     } else if (endWorkTime !== null) {
         await channelService.replySafe(message, `⏳ T'es déjà au travail, patience l'artiste ! Fin du chantier <t:${endWorkTime}:R>.`);
     } else {
