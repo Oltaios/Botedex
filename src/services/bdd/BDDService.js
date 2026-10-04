@@ -215,7 +215,7 @@ export class BDDService {
      */
     async checkIfAvailable(guildId, userId, fieldToCheck) {
         const row = await this.getDresseur(guildId, userId);
-        return row && row[fieldToCheck] === 1;
+        return row ? row[fieldToCheck] === 1 : false;
     }
 
     /**

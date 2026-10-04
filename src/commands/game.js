@@ -49,8 +49,8 @@ export async function execute(message) {
         await message.reply(
             `🎮 Un dresseur étrange surgit et envoie un ${pkm2Guess.nom}, il te met au défi de trouver son ou ses types ! ` +
             `\nTu as ${gameConfig.guessMyTypeMaxAttempts} essais.` +
-            `\n(Possible types : normal/fire/water/electric/grass/ice/fighting/poison/ground/flying/psychic/bug/rock/ghost/dragon/dark/steel/fairy)` +
-            `\nExemple d'une réponse : **!normal** ou **!normal/rock** (l'ordre en cas de double type n'est pas important)`
+            `\n(Ensemble des types : normal / feu /eau / electrik / plante / glace / combat / poison / sol / vol / psy / insecte / roche / spectre / dragon / tenebres / acier / fee )` +
+            `\nExemple d'une réponse : **!normal** ou **!normal/roche** (l'ordre en cas de double type n'est pas important)`
         );
 
         const responseKey = `${message.channel.id}:${message.author.id}`;
@@ -100,7 +100,7 @@ export async function execute(message) {
             pendingResponses.delete(responseKey); // Libère la clé
         });
     } else {
-        await message.reply("🌙 Jeu non disponible, il faut attendre minuit ! Espèce de drogué.");
+        await message.reply("❌ Jeu non disponible, il faut attendre le début de la prochaine heure ! Espèce de drogué.");
     }
 }
 

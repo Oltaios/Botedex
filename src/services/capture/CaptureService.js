@@ -82,7 +82,7 @@ export class CaptureService {
                     //L'utilisateur a pu utiliser une ball, son essai est consommé
                     await addTentativesCapture(message.author.id);
                     collector.resetTimer();
-                    const reussiteCapture = await this.capture(message.author.id, pokemonAvailable[1], ballChoiceMessage.content.slice(1), pokemonAvailable[0], numPkm, message);
+                    const reussiteCapture = await this.capture(message.author.id, pokemonAvailable[1], ballChoiceMessage.content.slice(1), pokemonAvailable[2], numPkm, message);
                     
                     //Le lancer a pu être effectué, succès ou échec à contrôler
                     await channelService.replySafe(message, ".", 1000);

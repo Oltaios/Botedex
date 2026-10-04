@@ -11,14 +11,14 @@
       "feesMultiplier": 1
     },
     "hyperball": {
-      "rate": 2,
-      "price": 70,
+      "rate": 1.9,
+      "price": 80,
       "feesMultiplier": 1
     }
   },
   "economy": {
     "workReward": 80,
-    "duplicateCaptureReward": 100,
+    "duplicateCaptureReward": 50,
     "gameCooldownHours": 24
   },
   "game": {
@@ -38,6 +38,6 @@
     }
   },
   "release": {
-    "notes": "🔧 Changement technique :\n\n- Désormais la progression de chaque dresseur est isolée entre chaque serveur Discord. Cela permet une équité pour l'ensemble des joueurs sur les classements qui arriveront prochainement."
+    "notes": "📝 Patch note\n\n✨ Features : \n- Ajout lien vers Livingdex pour un suivi détaillé des pokémons capturés par l'utilisateur. Lors du lancement de !pokedex, un lien est affiché (WARNING site en dehors du périmètre technique de Botedex)\n- Traduction du jeu en français pour les noms et les types (messages de spawn, !game)\n\n🐛 Corrections :\n- Corrections diverses de texte"
   }
 }
