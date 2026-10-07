@@ -1,7 +1,7 @@
 /**
  * Index des commandes
  * Centralise l'export de toutes les commandes
- * 
+ *
  * Exemple d'utilisation :
  *   import * as commands from './commands/index.js';
  *   await commands.ping.execute(message);
@@ -15,9 +15,10 @@ import * as work from './work.js';
 import * as money from './money.js';
 import * as balls from './balls.js';
 import * as pokedex from './pokedex.js';
+import * as casino from './casino.js';
 import * as help from './help.js';
 
-export { ping, capture, shop, game, work, money, balls, pokedex, help };
+export { ping, capture, shop, game, work, money, balls, pokedex, casino, help };
 
 /**
  * Liste toutes les commandes disponibles
@@ -33,6 +34,7 @@ export function getAllCommands() {
         money.metadata,
         balls.metadata,
         pokedex.metadata,
+        casino.metadata,
         help.metadata
     ];
 }

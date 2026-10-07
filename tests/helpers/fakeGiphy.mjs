@@ -25,7 +25,8 @@ export function stubGiphy({ gifUrl = 'https://media.giphy.com/fake/test.gif', ok
         return {
             ok,
             json: async () => ({
-                data: ok ? { images: { original: { url: gifUrl } } } : null
+                // /stickers/search renvoie un tableau de résultats
+                data: ok ? [{ images: { original: { url: gifUrl } } }] : []
             })
         };
     };

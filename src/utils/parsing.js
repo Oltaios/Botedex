@@ -89,6 +89,19 @@ export function parsingPkmNomType1Type2(id){
 }
 
 /**
+ * Retourne le nom et le poids d'un Pokemon
+ * @param {number} id - Numero du Pokemon (1 = 1ere ligne de donnees du CSV)
+ * @returns {Object} - { nomPoke: string, poids: string } (poids en kg)
+ */
+export function parsingPkmNomPoids(id){
+    var data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
+    let array = CSVToArray(data, ',');
+    let nomPoke = array[id][nameENG]
+    let poids = array[id][weight_kg]
+    return {nomPoke, poids};
+}
+
+/**
  * Parse une chaine CSV en tableau 2D
  * Gere les champs entre guillemets et les guillemets doubles a l'interieur
  * @param {string} strData - Contenu brut du fichier CSV

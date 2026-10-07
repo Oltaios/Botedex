@@ -9,14 +9,18 @@
 
 import { Ball } from '../models/Ball.js';
 import { bddService } from '../services/bdd/BDDService.js';
+import { getConfig } from '../utils/configLoader.js';
 import { pendingResponses } from '../core/client.js';
 import { channelService } from '../services/channel/ChannelService.js';
 
 /**
  * Exécute la commande !shop
- * Affiche le magasin (types de balls et prix depuis la config), puis attend
- * 15 s une commande d'achat au format "!<typeDeBall><nombre>" (ex: "!pokeball5").
+ * Affiche le magasin (un type de ball par entrée de la config balls, prix
+ * inclus), puis attend 15 s une commande d'achat au format
+ * "!<typeDeBall><nombre>" (ex: "!pokeball5").
  * Débite l'argent et crédite les balls si le solde suffit.
+ * Le type de ball est un mot sans espace : il sert à la fois de mot-clé de
+ * commande Discord, de champ de stockage et de libellé.
  * @param {Object} message - Message Discord ayant déclenché la commande
  * @param {Set<string>} pendingResponses - Clés des réponses en attente (pour ignorer les messages du joueur pendant l'attente)
  * @returns {Promise<void>}
@@ -28,12 +32,9 @@ export async function execute(message, pendingResponses) {
     // Marque l'utilisateur comme "en attente de réponse"
     pendingResponses.add(responseKey);
     
-    // Affiche l'inventaire du shop
-    const shopInventory = [
-        new Ball('pokeball'),
-        new Ball('superball'),
-        new Ball('hyperball')
-    ];
+    // Inventaire du shop : un ball par type déclaré dans la config
+    const shopInventory = Object.keys(getConfig().balls)
+        .map(ballType => new Ball(ballType));
 
     const moneyAvailable = await bddService.getMoneyForUser(message.guildId, currentUserId);
     
@@ -50,31 +51,27 @@ export async function execute(message, pendingResponses) {
     messageInventoryShop += "Format de réponse attendu : `<type de ball><nombre>` (ex: `!pokeball5` pour 5 Pokéballs)";
     await channelService.replySafe(message, messageInventoryShop);
     
-    // Crée le collector pour les réponses
-    const filter = m => m.author.id === message.author.id && 
-                     (m.content.startsWith('!pokeball') || 
-                      m.content.startsWith('!superball') || 
-                      m.content.startsWith('!hyperball'));
+    // Crée le collector pour les réponses : accepte "!<type><nombre>"
+    // pour chaque type de ball de la config, sans sensibilité à la casse
+    const filter = m => m.author.id === currentUserId &&
+        shopInventory.some(element => m.content.toLowerCase().startsWith(`!${element.getType().toLowerCase()}`));
     
     const collector = message.channel.createMessageCollector({ filter, max: 1, time: 15000 });
     
     collector.on('collect', async collected => {
-        let nbrBallToBuy = 1;
-        let commande = collected.content.substring(1); // Supprime le "!"
-        let ballTypeToBuy = null;
+        const commande = collected.content.substring(1).toLowerCase(); // Supprime le "!", insensible à la casse
         
-        if (commande.startsWith('pokeball')) {
-            ballTypeToBuy = 'pokeball';
-            commande = commande.substring(8);
-        } else if (commande.startsWith('superball')) {
-            ballTypeToBuy = 'superball';
-            commande = commande.substring(9);
-        } else if (commande.startsWith('hyperball')) {
-            ballTypeToBuy = 'hyperball';
-            commande = commande.substring(9);
+        // Les types sont testés du plus long au plus court : un type ne doit
+        // pas être tronqué par un autre type dont il est le préfixe
+        const ballTypeToBuy = shopInventory.map(element => element.getType())
+            .sort((a, b) => b.length - a.length)
+            .find(ballType => commande.startsWith(ballType.toLowerCase()));
+        if (ballTypeToBuy === undefined) {
+            await channelService.replySafe(collected, "Ce type de ball n'est pas en vente ici.");
+            return;
         }
         
-        nbrBallToBuy = parseInt(commande);
+        let nbrBallToBuy = parseInt(commande.substring(ballTypeToBuy.length));
         // Quantité invalide ou négative : on retombe sur 1
         // (sécurise aussi le $inc de purchaseBalls contre les quantités négatives)
         if (!Number.isInteger(nbrBallToBuy) || nbrBallToBuy < 1) {

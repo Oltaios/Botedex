@@ -8,6 +8,7 @@
  */
 
 import { bddService } from '../services/bdd/BDDService.js';
+import { getConfig } from '../utils/configLoader.js';
 import { channelService } from '../services/channel/ChannelService.js';
 
 /**
@@ -19,10 +20,9 @@ export async function execute(message) {
     const dresseurId = message.author.id;
     const ballsAvailable = await bddService.getBallsForUser(message.guildId, dresseurId);
     
+    const ballTypes = Object.keys(getConfig().balls);
     let toPrint = "🎒 Ce qui se trouve dans tes poches : \n";
-    toPrint += `pokeball : ${ballsAvailable[0]}\n`;
-    toPrint += `superball : ${ballsAvailable[1]}\n`;
-    toPrint += `hyperball : ${ballsAvailable[2]}\n`;
+    toPrint += ballTypes.map((ballType, index) => `${ballType} : ${ballsAvailable[index]}`).join("\n");
     
     await channelService.replySafe(message, toPrint);
 }

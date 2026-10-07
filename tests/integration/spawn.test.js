@@ -57,7 +57,7 @@ test('spawn : annonce le nom FR, cherche le GIF avec le nom EN + @pokemon', asyn
     assert.equal(gif.calls.length, 1, 'une seule requête Giphy');
     const url = new URL(gif.calls[0]);
     assert.equal(url.hostname, 'api.giphy.com');
-    assert.equal(decodeURIComponent(url.searchParams.get('tag')), 'Bulbasaur @pokemon');
+    assert.equal(decodeURIComponent(url.searchParams.get('q')), 'Bulbasaur @pokemon');
 
     // Le GIF puis l'appel à !capture partent dans le channel principal
     assert.ok(channel.sent.includes('https://media.giphy.com/fake/test.gif'));

@@ -1,5 +1,9 @@
-# Workflow CI : exécute les tests de non-régression (npm test) à chaque push
-# sur main/dev et sur chaque pull request.
+# Workflow CI : exécute les tests de non-régression (npm test) sur chaque
+# pull request (check exigé par la protection de branche) et sur les push
+# directs sur main, pour tester le commit de fusion (nouveau SHA jamais
+# testé par la PR). Les push sur les autres branches (dev, features) ne
+# déclenchent rien : la PR porte sur le même commit, un run de plus
+# serait un doublon.
 # Aucun secret requis : les tests utilisent des variables factices
 # (cf. tests/helpers/env.mjs) et MongoDB en mémoire.
 
@@ -7,7 +11,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
 
 jobs:

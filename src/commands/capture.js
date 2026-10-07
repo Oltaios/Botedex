@@ -1,7 +1,9 @@
 /**
  * Commande !capture
  * Lance une tentative de capture de Pokémon
- * 
+ * "!capture <ball>" tente directement la capture avec la ball choisie,
+ * "!capture" seul laisse le service demander la ball à utiliser
+ *
  * Exemple d'utilisation :
  *   import { execute } from './commands/capture.js';
  *   await execute(message, pendingResponses);
@@ -12,8 +14,10 @@ import { pendingResponses, getLockPkmAvailable, setLockPkmAvailable, getTentativ
 import { channelService } from '../services/channel/ChannelService.js';
 
 /**
- * Exécute la commande !capture (réservée à oltaios tant que la fonctionnalité est en test)
- * Délègue tout le flux à CaptureService.gererEventCapture()
+ * Exécute la commande !capture
+ * Délègue tout le flux à CaptureService.gererEventCapture() : le type de
+ * ball éventuellement passé en argument ("!capture pokeball") est extrait
+ * du message, absent signifie que la ball sera demandée à l'utilisateur
  * @param {Object} message - Message Discord ayant déclenché la commande
  * @returns {Promise<void>}
  */
@@ -35,7 +39,9 @@ export async function execute(message) {
         const responseKey = `capture-${message.author.id}`;
         console.log("Appel de capture.js ajout de responseKey : " + responseKey);
         pendingResponses.add(responseKey);
-        await captureService.gererEventCapture(message, responseKey);
+        // Raccourci "!capture <ball>" : type de ball éventuel après la commande
+        const ballType = message.content.slice('!capture'.length).trim().toLowerCase() || null;
+        await captureService.gererEventCapture(message, responseKey, ballType);
     } else {
         await channelService.replySafe(message, "Commande réservée à oltaios pour l'instant.");
     }
@@ -44,8 +50,8 @@ export async function execute(message) {
 // Metadata pour l'aide automatique
 export const metadata = {
     name: 'capture',
-    description: 'Lance une tentative de capture de Pokémon',
-    usage: '!capture',
+    description: 'Lance une tentative de capture de Pokémon (!capture pokeball pour choisir directement la ball)',
+    usage: '!capture [ball]',
     category: 'Pokémon',
     adminOnly: false
 };

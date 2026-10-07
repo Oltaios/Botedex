@@ -13,7 +13,8 @@
  *
  * Schéma du document dresseur (collection 'dresseurs') :
  *   { _id: { guildId, userId }, name, argent, nbrCapture, captureAvailable,
- *     gameAvailable, isWorking, workStartTime, pokeball, superball, hyperball,
+ *     gameTokens: { '<jeu>': Date du dernier jeton consommé }, isWorking,
+ *     workStartTime, un champ par type de ball de la config,
  *     '<numéroPokémon>' (1-151): 0|1, ... }
  *
  * Utilisation :
@@ -23,7 +24,7 @@
  */
 
 import { MongoClient } from 'mongodb';
-import { getDatabaseConfig } from '../../utils/configLoader.js';
+import { getConfig, getDatabaseConfig } from '../../utils/configLoader.js';
 
 export class BDDService {
     static #instance = null; // Instance unique (Singleton)
@@ -210,7 +211,7 @@ export class BDDService {
      * Vérifie si un champ booléen (0/1) est actif pour un dresseur
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
-     * @param {string} fieldToCheck - Champ à vérifier (ex: 'gameAvailable')
+     * @param {string} fieldToCheck - Champ à vérifier (ex: 'captureAvailable')
      * @returns {Promise<boolean>} - true si le champ vaut 1, false sinon
      */
     async checkIfAvailable(guildId, userId, fieldToCheck) {
@@ -302,6 +303,25 @@ export class BDDService {
     }
 
     /**
+     * Règle un pari de casino de façon atomique : applique la variation nette
+     * (gain - mise) en une seule opération indivisible. La condition de solde
+     * est dans le filtre : impossible de passer sous 0 même si le solde a
+     * changé depuis la vérification en amont
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @param {number} bet - Mise engagée (>= 0)
+     * @param {number} netChange - Variation nette du solde (>= -bet)
+     * @returns {Promise<number>} - 0 si pari réglé, 1 si solde insuffisant
+     */
+    async settleCasinoBet(guildId, userId, bet, netChange) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId), argent: { $gte: bet } },
+            { $inc: { argent: netChange } }
+        );
+        return result.matchedCount === 0 ? 1 : 0;
+    }
+
+    /**
      * Crée un nouveau dresseur avec les valeurs par défaut
      * Pré-remplit tous les Pokémon (1 à 151) comme non capturés
      * @param {string} guildId - ID du serveur Discord (isolation des données)
@@ -316,13 +336,13 @@ export class BDDService {
             argent: 500,
             nbrCapture: 0,
             captureAvailable: 1,
-            gameAvailable: 1,
             isWorking: 0,
-            pokeball: 0,
-            superball: 0,
-            hyperball: 0,
             workStartTime: null
         };
+        // Ajoute un champ de stock par type de ball de la config (0 par défaut)
+        for (const ballType of Object.keys(getConfig().balls)) {
+            row[ballType] = 0;
+        }
         // Ajoute les champs pour les Pokémon 1-151 (génération 1 du CSV)
         for (let i = 1; i <= 151; i++) {
             row[i] = 0;
@@ -382,11 +402,12 @@ export class BDDService {
      * Retourne le stock de balls d'un dresseur
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
-     * @returns {Promise<Array<number>>} - [pokeball, superball, hyperball]
+     * @returns {Promise<Array<number>>} - Un stock par type de ball de la config (ordre de la config)
      */
     async getBallsForUser(guildId, userId) {
         const row = await this.getDresseur(guildId, userId);
-        return row ? [row.pokeball, row.superball, row.hyperball] : [0, 0, 0];
+        // Un stock par type de ball de la config, dans l'ordre de la config
+        return Object.keys(getConfig().balls).map(ballType => row?.[ballType] || 0);
     }
 
     /**
@@ -407,25 +428,41 @@ export class BDDService {
     }
 
     /**
-     * Consomme le jeton de jeu quotidien d'un dresseur
+     * Retourne la date du dernier jeton de jeu consommé pour un jeu donné
+     * Un jeton est consommé à la première réponse d'un mini-jeu ; sa
+     * disponibilité se calcule par comparaison avec l'heure courante
+     * (GameService.isGameAvailable), sans reset planifié
+     * Projection sur le seul champ utile : évite de charger tout le
+     * document (151 champs Pokédex)
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
-     * @returns {Promise<void>}
+     * @param {string} gameType - Type de jeu (clé dans gameTokens, ex: 'type')
+     * @returns {Promise<Date|null>} - Date du dernier jeton consommé, ou null
+     *          si le dresseur n'existe pas / n'a jamais joué à ce jeu
      */
-    async consumeGameAvailable(guildId, userId) {
-        await this.updateOneFieldForOneUser(guildId, userId, 'gameAvailable', 0);
+    async getGameLastPlayedAt(guildId, userId, gameType) {
+        const row = await this.db.collection(this.#dresseursCollection).findOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { projection: { _id: 0, gameTokens: 1 } }
+        );
+        const lastPlayedAt = row?.gameTokens?.[gameType] ?? null;
+        return lastPlayedAt !== null ? new Date(lastPlayedAt) : null;
     }
 
     /**
-     * Réinitialise les jetons de jeu des dresseurs d'un serveur (mise à 1)
-     * Appelé à minuit via GameService.startDailyResetSchedule()
-     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
-     *        les guilds (mono-serveur, sans isolation)
+     * Consomme le jeton de jeu d'un dresseur pour un jeu donné : enregistre
+     * la date de consommation dans la map gameTokens
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @param {string} gameType - Type de jeu (clé dans gameTokens, ex: 'type')
+     * @param {Date} date - Date de consommation du jeton
      * @returns {Promise<void>}
      */
-    async resetGameAvailable(guildId) {
-        await this.updateMany(guildId, 'gameAvailable', 1);
-        console.log("Reset des tokens game effectué");
+    async recordGamePlayed(guildId, userId, gameType, date) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { $set: { [`gameTokens.${gameType}`]: date } }
+        );
     }
 
     /**

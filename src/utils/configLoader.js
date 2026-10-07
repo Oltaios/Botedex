@@ -34,10 +34,12 @@ export function getConfig() {
             balls: {
                 pokeball: { rate: 1, price: 10, feesMultiplier: 1 },
                 superball: { rate: 1.5, price: 15, feesMultiplier: 1 },
-                hyperball: { rate: 2, price: 20, feesMultiplier: 1 }
+                hyperball: { rate: 2, price: 20, feesMultiplier: 1 },
+                MaitreBall: { rate: 100, price: 2000, feesMultiplier: 1 }
             },
-            economy: { workReward: 100, gameCooldownHours: 24 },
-            game: { numberOfPokemon: 151, guessMyTypeTimeMs: 15000, guessMyTypeMaxAttempts: 3, guessMyTypeRewardSingle: 100, guessMyNameReward: 50 },
+            economy: { workReward: 100, duplicateCaptureReward: 100, gameCooldownHours: 24 },
+            game: { numberOfPokemon: 151, chooseGameTimeMs: 15000, guessMyTypeTimeMs: 15000, guessMyTypeMaxAttempts: 3, guessMyTypeRewardSingle: 100, guessMyWeightTimeMs: 15000, guessMyWeightMaxAttempts: 3, guessMyWeightTolerance: 0.1, guessMyWeightReward: 100, guessMyNameReward: 50 },
+            casino: { minBet: 1, maxBet: 500, responseTimeMs: 15000, payouts: [{ chance: 0.005, multiplier: 50, label: 'Jackpot' }, { chance: 0.03, multiplier: 10, label: 'Gros lot' }, { chance: 0.08, multiplier: 3, label: 'Lot moyen' }, { chance: 0.14, multiplier: 1, label: 'Remboursement' }] },
             spawn: { minIntervalMinutes: 30, maxIntervalMinutes: 60 }
         };
         return configCache;

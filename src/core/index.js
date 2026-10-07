@@ -10,7 +10,6 @@ import { readFile } from 'fs/promises';
 import { client, token } from './client.js';
 import { bddService } from '../services/bdd/BDDService.js';
 import { spawnService } from '../services/game/SpawnService.js';
-import { gameService } from '../services/game/GameService.js';
 import { workService } from '../services/economy/WorkService.js';
 import { channelService } from '../services/channel/ChannelService.js';
 import { registerAllEvents } from '../events/index.js';
@@ -24,7 +23,7 @@ import { getConfig } from '../utils/configLoader.js';
  * Initialise tous les services du bot dans l'ordre de leurs dépendances :
  * 1. BDDService (connexion MongoDB) - process.exit(1) en cas d'échec
  * 2. ChannelService (channel fixe pour les spawns/annonces)
- * 3. GameService (reset des jetons de jeu + planification quotidienne)
+ * 3. GameService (jetons de jeu horaires, calculés à la demande)
  * 4. WorkService (libération des dresseurs bloqués au travail après un redémarrage)
  * @returns {Promise<void>} - Rejette si la connexion BDD échoue
  */
@@ -49,10 +48,9 @@ async function initServices() {
         console.error('❌ Impossible d\'envoyer le message de démarrage:', error);
     }
     
-    // Réinitialise les jetons de jeu
-    await gameService.resetAllGameTokens();
-    // Planifie le reset quotidien à minuit
-    gameService.startDailyResetSchedule();
+    // Jetons de jeu : plus de reset planifié, la disponibilité horaire se
+    // calcule à la demande (GameService.isGameAvailable) depuis les dates
+    // stockées en base
     console.log('✅ GameService initialisé');
 
     // Libère les dresseurs bloqués au travail lors d'un redémarrage

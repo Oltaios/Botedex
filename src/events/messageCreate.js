@@ -79,15 +79,19 @@ export async function handle(message) {
         
         // Route vers les commandes spécifiques
         try {
+            // !game : accepte un type de jeu en argument ("!game type") ou rien
+            if (message.content === '!game' || message.content.startsWith('!game ')) {
+                await commands.game.execute(message);
+                return;
+            }
+            // !capture : accepte un type de ball en argument ("!capture pokeball") ou rien
+            if (message.content === '!capture' || message.content.startsWith('!capture ')) {
+                await commands.capture.execute(message, pendingResponses);
+                return;
+            }
             switch (message.content) {
                 case '!shop':
                     await commands.shop.execute(message, pendingResponses);
-                    break;
-                case '!capture':
-                    await commands.capture.execute(message, pendingResponses);
-                    break;
-                case '!game':
-                    await commands.game.execute(message);
                     break;
                 case '!work':
                     await commands.work.execute(message);
@@ -100,6 +104,9 @@ export async function handle(message) {
                     break;
                 case '!pokedex':
                     await commands.pokedex.execute(message);
+                    break;
+                case '!casino':
+                    await commands.casino.execute(message, pendingResponses);
                     break;
                 default:
                     // Commande inconnue
