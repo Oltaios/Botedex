@@ -42,7 +42,7 @@ export async function execute(message, pendingResponses) {
     messageInventoryShop += "📋 **Inventaire disponible :**\n";
     
     shopInventory.forEach(element => {
-        messageInventoryShop += `${element.getType()} : ${element.getPrice()}$\n`;
+        messageInventoryShop += `${element.getNom()} : ${element.getPrice()}$\n`;
     });
 
         
@@ -93,7 +93,7 @@ export async function execute(message, pendingResponses) {
 
             // Résumé de l'opération en sortie de shop
             await collected.reply(
-                `🛒 Achat effectué : ${nbrBallToBuy} ${ballTypeToBuy}${nbrBallToBuy > 1 ? 's' : ''} pour ${totalPrice}$\n` +
+                `🛒 Achat effectué : ${nbrBallToBuy} ${ball.getNom()}${nbrBallToBuy > 1 ? 's' : ''} pour ${totalPrice}$\n` +
                 `Solde restant : ${newBalance}$\n` +
                 `Paré pour aller capturer quelques pokémons !`
             );

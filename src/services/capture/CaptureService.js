@@ -59,13 +59,14 @@ export class CaptureService {
      */
     listerBalls() {
         return Object.keys(this.config.balls)
-            .map((ball) => `**!${ball}**`)
+            .map((ball) => `**!${this.config.balls[ball]?.nom ?? ball}**`)
             .join(' / ');
     }
 
     /**
      * Résout une saisie utilisateur vers le type de ball de la config,
-     * sans sensibilité à la casse : "!capture maitreball" trouve "MaitreBall"
+     * sans sensibilité à la casse : les clés de la config sont en minuscules,
+     * "MaitreBall" ou "MAITREBALL" trouvent "maitreball"
      * @param {string} saisie - Type de ball saisi par le dresseur
      * @returns {string|null} - Clé exacte de la config balls, ou null si inconnue
      */
@@ -115,7 +116,7 @@ export class CaptureService {
             // Mode raccourci "!capture <ball>" : capture directe sans question
             if (ballType !== null) {
                 // Résout la saisie vers la clé exacte de la config, sans
-                // sensibilité à la casse ("maitreball" -> "MaitreBall")
+                // sensibilité à la casse ("MAITREBALL" -> "maitreball")
                 ballType = this.resoudreBallType(ballType);
                 if (!this.config.balls[ballType]) {
                     await channelService.replySafe(message, `Je ne connais pas ce type de ball ! Balls disponibles :\n${this.listerBalls()}`);
@@ -141,7 +142,7 @@ export class CaptureService {
             const inventoryDisplay = await inventoryService.getInventoryDisplay(guildId, message.author.id);
             await channelService.replySafe(message, inventoryDisplay + `\nQuelle pokéball veux-tu utiliser ? Exemple de réponse attendu **!pokeball**`);
             const ballsConnues = Object.keys(this.config.balls);
-            // Insensible à la casse : "MaitreBall" se tape aussi "!maitreball"
+            // Insensible à la casse : "!POKEBALL" se tape aussi "!pokeball"
             const filter = m => m.author.id === message.author.id &&
                 ballsConnues.some(ball => m.content.toLowerCase() === `!${ball.toLowerCase()}`);
             // Un choix de type épuisé n'arrête pas la capture, l'utilisateur peut retenter un autre type dans le temps restant
@@ -155,7 +156,7 @@ export class CaptureService {
                 if (captureDone) return;
                 captureDone = true;
                 collector.resetTimer();
-                const ballChoisie = ballChoiceMessage.content.slice(1);
+                const ballChoisie = ballChoiceMessage.content.slice(1).toLowerCase();
                 console.log("[CAPTURE] Type de ball à utiliser = " + ballChoisie);
 
                 const lance = await this.effectuerCapture(message, guildId, numPkm, pokemonAvailable, ballChoisie, ballChoiceMessage);
@@ -252,6 +253,8 @@ export class CaptureService {
         else{
             // Échec : Pokémon non capturé
             await channelService.replySafe(message, this.messagesEchec.piocher({ nomPoke: pokemonAvailable[2] }));
+            // Compteur de statistique : échec de capture persisté
+            await bddService.incrementerEchecCapture(guildId, userId);
             setLockPkmAvailable(0); //On libère le lock du pokémon
         }
         return true;

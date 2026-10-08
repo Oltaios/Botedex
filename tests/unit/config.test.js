@@ -16,7 +16,10 @@ const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
 const csv = readFileSync(join(ROOT, 'data/pokemonLight.csv'), 'utf-8');
 
 test('gameConfig : structure requise', () => {
-    for (const type of ['pokeball', 'superball', 'hyperball']) {
+    for (const [type, ball] of Object.entries(gameConfig.balls)) {
+        assert.equal(typeof ball.nom, 'string', `balls.${type}.nom requis (nom d'affichage)`);
+        assert.ok(ball.nom.length > 0, `balls.${type}.nom non vide`);
+        assert.equal(type, type.toLowerCase(), `clé balls.${type} en minuscules (utilisée en BDD et pour la saisie)`);
         assert.ok(Number.isFinite(gameConfig.balls[type]?.rate), `balls.${type}.rate requis`);
         assert.ok(Number.isFinite(gameConfig.balls[type]?.price), `balls.${type}.price requis`);
     }
@@ -33,6 +36,19 @@ test('gameConfig : structure requise', () => {
 test('cohérence : numberOfPokemon === nombre de lignes de données du CSV', () => {
     const dataLines = csv.split(/\r?\n/).filter((l) => l !== '').length - 1;
     assert.equal(gameConfig.game.numberOfPokemon, dataLines);
+});
+
+test('admin : adminUserIds est une chaîne (IDs séparés par des virgules)', () => {
+    assert.equal(typeof gameConfig.admin?.adminUserIds, 'string', 'admin.adminUserIds requis');
+});
+
+test('getAdminUserIds : parse une chaîne d\'IDs séparés par des virgules', async () => {
+    const { getAdminUserIds } = await import('../../src/utils/configLoader.js');
+    process.env.ADMIN_USER_IDS = ' 111 ,, 222 ,';
+    assert.deepEqual(getAdminUserIds(), ['111', '222'], 'espaces et entrées vides ignorées');
+    process.env.ADMIN_USER_IDS = '';
+    assert.deepEqual(getAdminUserIds(), [], 'liste vide si aucun admin');
+    delete process.env.ADMIN_USER_IDS;
 });
 
 test('database.json : base et collection dresseurs définies', () => {

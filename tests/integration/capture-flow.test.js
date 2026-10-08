@@ -135,6 +135,7 @@ test('capture ratée : ball perdue, spawn toujours actif', async () => {
     const { message } = await lancerCapture({ userId: 'uc3', guildId: 'gc3', rng: 0.05 });
 
     assert.deepEqual(await bddService.getBallsForUser('gc3', 'uc3'), stocks({}), 'ball perdue quand même');
+    assert.equal((await bddService.getDresseur('gc3', 'uc3')).capturesEchouees, 1, 'échec comptabilisé (statistique)');
     assert.equal(await bddService.alreadyCaptured('gc3', 'uc3', NUM_PKM), false, 'Pokédex inchangé');
     assert.equal(getNumPkmAvailable(), NUM_PKM, 'spawn toujours actif');
     assert.equal(getLockPkmAvailable(), 0, 'lock libéré pour les autres');
@@ -150,7 +151,7 @@ test('type de ball épuisé : la capture continue sans décompter', async () => 
     await bddService.updateOneFieldForOneUser('gc4', 'uc4', 'pokeball', 2);
     setNumPkmAvailable(NUM_PKM);
 
-    const { message, ballChoice } = await lancerCapture({ userId: 'uc4', guildId: 'gc4', rng: 0.5, choixBall: '!hyperball' });
+    const { message, ballChoice } = await lancerCapture({ userId: 'uc4', guildId: 'gc4', rng: 0.5, choixBall: '!Hyperball' });
 
     // La réponse est adressée au message de choix de ball, pas à la commande
     assert.ok(ballChoice.replies.some((r) => String(r).includes('pas assez de ce type')));
@@ -207,7 +208,7 @@ test('capture raccourcie : type de ball inconnu refusé sans rien consommer', as
     await captureService.gererEventCapture(message, `capture-uc7`, 'masterball');
 
     assert.ok(message.replies.some((r) => String(r).includes('Je ne connais pas ce type de ball')), 'refus');
-    assert.ok(message.replies.some((r) => String(r).includes('**!pokeball**')), 'balls existantes listées');
+    assert.ok(message.replies.some((r) => String(r).includes('**!Pokeball**')), 'balls existantes listées (nom d\'affichage)');
     assert.deepEqual(await bddService.getBallsForUser('gc7', 'uc7'), stocks({ pokeball: 1 }), 'rien décompté');
     assert.equal(getNumPkmAvailable(), NUM_PKM, 'spawn intact');
     assert.equal(getLockPkmAvailable(), 0, 'lock libéré');
@@ -232,16 +233,16 @@ test('capture raccourcie : ball choisie en stock insuffisant, rien consommé', a
 
 test('MaitreBall : saisie insensible à la casse, capture via la config', async () => {
     await bddService.createNewUser('gc12', 'uc12', 'j12');
-    await bddService.updateOneFieldForOneUser('gc12', 'uc12', 'MaitreBall', 1);
+    await bddService.updateOneFieldForOneUser('gc12', 'uc12', 'maitreball', 1);
     setNumPkmAvailable(NUM_PKM);
 
-    // Résolution de la saisie vers la clé exacte de la config
-    assert.equal(captureService.resoudreBallType('maitreball'), 'MaitreBall');
-    assert.equal(captureService.resoudreBallType('MAITREBALL'), 'MaitreBall');
-    assert.equal(captureService.resoudreBallType('pokeball'), 'pokeball');
+    // Résolution de la saisie vers la clé exacte (minuscule) de la config
+    assert.equal(captureService.resoudreBallType('maitreball'), 'maitreball');
+    assert.equal(captureService.resoudreBallType('MAITREBALL'), 'maitreball');
+    assert.equal(captureService.resoudreBallType('MaitreBall'), 'maitreball', 'saisie avec majuscules résolue');
     assert.equal(captureService.resoudreBallType('masterball'), null, 'type inconnu');
 
-    // Flux complet en raccourci minuscule : la MaitreBall (rate 100) capture à coup sûr
+    // Flux complet en raccourci : la MaitreBall (rate 100) capture à coup sûr
     const channel = fakeChannel({ id: CHANNEL_ID });
     const message = fakeMessage({ authorId: 'uc12', guildId: 'gc12', channel, content: '!capture maitreball' });
     const restaurer = fixerRandom(0.05); // RNG faible : seule la MaitreBall réussit

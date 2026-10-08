@@ -20,9 +20,9 @@ export async function execute(message) {
     const dresseurId = message.author.id;
     const ballsAvailable = await bddService.getBallsForUser(message.guildId, dresseurId);
     
-    const ballTypes = Object.keys(getConfig().balls);
+    const ballConfigs = Object.entries(getConfig().balls);
     let toPrint = "🎒 Ce qui se trouve dans tes poches : \n";
-    toPrint += ballTypes.map((ballType, index) => `${ballType} : ${ballsAvailable[index]}`).join("\n");
+    toPrint += ballConfigs.map(([ballType, ball], index) => `${ball.nom ?? ballType} : ${ballsAvailable[index]}`).join("\n");
     
     await channelService.replySafe(message, toPrint);
 }

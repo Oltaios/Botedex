@@ -17,8 +17,9 @@ import * as balls from './balls.js';
 import * as pokedex from './pokedex.js';
 import * as casino from './casino.js';
 import * as help from './help.js';
+import * as admin from './admin.js';
 
-export { ping, capture, shop, game, work, money, balls, pokedex, casino, help };
+export { ping, capture, shop, game, work, money, balls, pokedex, casino, help, admin };
 
 /**
  * Liste toutes les commandes disponibles
@@ -35,6 +36,7 @@ export function getAllCommands() {
         balls.metadata,
         pokedex.metadata,
         casino.metadata,
-        help.metadata
+        help.metadata,
+        admin.metadata
     ];
 }

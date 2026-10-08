@@ -14,7 +14,8 @@
  * Schéma du document dresseur (collection 'dresseurs') :
  *   { _id: { guildId, userId }, name, argent, nbrCapture, captureAvailable,
  *     gameTokens: { '<jeu>': Date du dernier jeton consommé }, isWorking,
- *     workStartTime, un champ par type de ball de la config,
+ *     workStartTime, argentGagne, ballsAchetees, capturesEchouees, argentMise,
+ *     un champ par type de ball de la config,
  *     '<numéroPokémon>' (1-151): 0|1, ... }
  *
  * Utilisation :
@@ -251,6 +252,7 @@ export class BDDService {
 
     /**
      * Ajoute de l'argent à un dresseur (incrément atomique)
+     * Alimente aussi le compteur de statistique argentGagne (total accumulé)
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {number} amount - Montant à ajouter
@@ -259,7 +261,7 @@ export class BDDService {
     async gainMoney(guildId, userId, amount) {
         await this.db.collection(this.#dresseursCollection).updateOne(
             { _id: this.#dresseurId(guildId, userId) },
-            { $inc: { argent: amount } }
+            { $inc: { argent: amount, argentGagne: amount } }
         );
     }
 
@@ -286,6 +288,7 @@ export class BDDService {
 
     /**
      * Achat de balls atomique : débite le prix et crédite les balls
+     * (alimente aussi le compteur de statistique ballsAchetees)
      * en une seule opération indivisible
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
@@ -297,14 +300,16 @@ export class BDDService {
     async purchaseBalls(guildId, userId, ballType, quantity, totalPrice) {
         const result = await this.db.collection(this.#dresseursCollection).updateOne(
             { _id: this.#dresseurId(guildId, userId), argent: { $gte: totalPrice } },
-            { $inc: { argent: -totalPrice, [ballType]: quantity } }
+            { $inc: { argent: -totalPrice, [ballType]: quantity, ballsAchetees: quantity } }
         );
         return result.matchedCount === 0 ? 1 : 0;
     }
 
     /**
      * Règle un pari de casino de façon atomique : applique la variation nette
-     * (gain - mise) en une seule opération indivisible. La condition de solde
+     * (gain - mise) en une seule opération indivisible. Alimente aussi les
+     * compteurs de statistiques : argentMise (total misé) et argentGagne
+     * (partie gain brut du tirage, 0 si perte sèche). La condition de solde
      * est dans le filtre : impossible de passer sous 0 même si le solde a
      * changé depuis la vérification en amont
      * @param {string} guildId - ID du serveur Discord (isolation des données)
@@ -316,7 +321,7 @@ export class BDDService {
     async settleCasinoBet(guildId, userId, bet, netChange) {
         const result = await this.db.collection(this.#dresseursCollection).updateOne(
             { _id: this.#dresseurId(guildId, userId), argent: { $gte: bet } },
-            { $inc: { argent: netChange } }
+            { $inc: { argent: netChange, argentMise: bet, argentGagne: Math.max(0, netChange + bet) } }
         );
         return result.matchedCount === 0 ? 1 : 0;
     }
@@ -337,7 +342,12 @@ export class BDDService {
             nbrCapture: 0,
             captureAvailable: 1,
             isWorking: 0,
-            workStartTime: null
+            workStartTime: null,
+            // Compteurs de statistiques (suivi de l'activité du dresseur)
+            argentGagne: 0,
+            ballsAchetees: 0,
+            capturesEchouees: 0,
+            argentMise: 0
         };
         // Ajoute un champ de stock par type de ball de la config (0 par défaut)
         for (const ballType of Object.keys(getConfig().balls)) {
@@ -385,6 +395,24 @@ export class BDDService {
         // ?? null normalise undefined (champ absent) en null : le contrat
         // de la methode est "null si pas de session", quel que soit le stockage
         return row?.workStartTime ?? null;
+    }
+
+    /**
+     * Retourne tous les dresseurs actuellement au travail (isWorking = 1)
+     * Projection sur les seuls champs utiles : évite de charger tout le
+     * document (151 champs Pokédex) pour chaque dresseur
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @returns {Promise<Array<Object>>} - Dresseurs au travail :
+     *          [{ _id: { guildId, userId }, name, workStartTime }]
+     */
+    async getWorkingDresseurs(guildId) {
+        const filter = guildId
+            ? { '_id.guildId': guildId, isWorking: 1 }
+            : { isWorking: 1 };
+        return await this.db.collection(this.#dresseursCollection)
+            .find(filter, { projection: { _id: 1, name: 1, workStartTime: 1 } })
+            .toArray();
     }
 
     /**
@@ -480,6 +508,76 @@ export class BDDService {
             ? { '_id.guildId': guildId, isWorking: 1 }
             : { isWorking: 1 };
         await this.db.collection(this.#dresseursCollection).updateMany(filter, { $set: { isWorking: 0 } });
+    }
+
+    /**
+     * Enregistre un échec de capture pour un dresseur (compteur de statistique)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<void>} - Sans effet si le dresseur n'existe pas
+     */
+    async incrementerEchecCapture(guildId, userId) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { $inc: { capturesEchouees: 1 } }
+        );
+    }
+
+    /**
+     * Retourne les statistiques agrégées des dresseurs d'un serveur :
+     * nombre de dresseurs, argent total accumulé (gains bruts), balls
+     * achetées, échecs de capture, argent misé au casino et argent
+     * actuellement en circulation (somme des soldes)
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @returns {Promise<Object>} - { dresseurs, argentGagne, ballsAchetees,
+     *          capturesEchouees, argentMise, argentEnCirculation }
+     */
+    async getStatsDresseurs(guildId) {
+        const match = guildId ? { '_id.guildId': guildId } : {};
+        const [stats] = await this.db.collection(this.#dresseursCollection).aggregate([
+            { $match: match },
+            { $group: {
+                _id: null,
+                dresseurs: { $sum: 1 },
+                argentGagne: { $sum: '$argentGagne' },
+                ballsAchetees: { $sum: '$ballsAchetees' },
+                capturesEchouees: { $sum: '$capturesEchouees' },
+                argentMise: { $sum: '$argentMise' },
+                argentEnCirculation: { $sum: '$argent' }
+            } }
+        ]).toArray();
+        return stats ?? { dresseurs: 0, argentGagne: 0, ballsAchetees: 0, capturesEchouees: 0, argentMise: 0, argentEnCirculation: 0 };
+    }
+
+    /**
+     * Retourne les meilleurs dresseurs d'un serveur, classés par argent
+     * accumulé, avec leurs compteurs de statistiques (projection réduite,
+     * sans les 151 champs Pokédex)
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @param {number} [limit=5] - Nombre maximal de dresseurs retournés
+     * @returns {Promise<Array<Object>>} - [{ userId, name, argent,
+     *          argentGagne, ballsAchetees, capturesEchouees, argentMise }]
+     */
+    async getTopDresseurs(guildId, limit = 5) {
+        const filter = guildId ? { '_id.guildId': guildId } : {};
+        return await this.db.collection(this.#dresseursCollection)
+            .find(filter, {
+                projection: {
+                    _id: 0,
+                    userId: '$_id.userId',
+                    name: 1,
+                    argent: 1,
+                    argentGagne: 1,
+                    ballsAchetees: 1,
+                    capturesEchouees: 1,
+                    argentMise: 1
+                }
+            })
+            .sort({ argentGagne: -1 })
+            .limit(limit)
+            .toArray();
     }
 }
 

@@ -86,7 +86,7 @@ export function parsingPkmNomType1Type2(id){
     let type_1 = array[id][type1]
     let type_2 = array[id][type2]
     //console.log("type1 " + type_1 + " type2 " + type_2)
-    return {nomPoke, type_1, type_2, nomPokeFR};
+    return {nomPokeENG, type_1, type_2, nomPokeFR};
 }
 
 /**

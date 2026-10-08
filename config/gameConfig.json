@@ -1,21 +1,25 @@
 {
   "balls": {
-    "Pokeball": {
+    "pokeball": {
+      "nom": "Pokeball",
       "rate": 1,
       "price": 20,
       "feesMultiplier": 1
     },
-    "Superball": {
+    "superball": {
+      "nom": "Superball",
       "rate": 1.5,
       "price": 80,
       "feesMultiplier": 1
     },
-    "Hyperball": {
+    "hyperball": {
+      "nom": "Hyperball",
       "rate": 1.9,
       "price": 120,
       "feesMultiplier": 1
     },
-    "MaitreBall": {
+    "maitreball": {
+      "nom": "MaitreBall",
       "rate": 100,
       "price": 2000,
       "feesMultiplier": 1
@@ -25,6 +29,9 @@
     "workReward": 80,
     "duplicateCaptureReward": 50,
     "gameCooldownHours": 24
+  },
+  "admin": {
+    "adminUserIds": ""
   },
   "game": {
     "numberOfPokemon": 151,

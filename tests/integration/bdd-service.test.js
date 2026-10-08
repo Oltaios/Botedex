@@ -50,6 +50,11 @@ test('createNewUser : _id composite { guildId, userId } dans cet ordre', async (
     assert.equal(doc._id.userId, 'uA');
     assert.equal(doc.name, 'toto');
     assert.equal(doc.argent, 500);
+    // Compteurs de statistiques initialisés à 0
+    assert.equal(doc.argentGagne, 0);
+    assert.equal(doc.ballsAchetees, 0);
+    assert.equal(doc.capturesEchouees, 0);
+    assert.equal(doc.argentMise, 0);
     assert.equal(doc.gameTokens, undefined, 'jetons de jeu créés à la première réponse');
     assert.deepEqual(
         await bddService.getBallsForUser('gA', 'uA'),
@@ -64,6 +69,9 @@ test('isolation par serveur : un même dresseur a un document par guild', async 
 
     assert.equal(await bddService.getMoneyForUser('g1', 'u1'), 600);
     assert.equal(await bddService.getMoneyForUser('g2', 'u1'), 500);
+    // Statistique argentGagne : alimentée uniquement sur le serveur du gain
+    assert.equal((await bddService.getDresseur('g1', 'u1')).argentGagne, 100);
+    assert.equal((await bddService.getDresseur('g2', 'u1')).argentGagne, 0);
 
     // L'ordre des champs inversé ne doit RIEN matcher : c'est le contrat
     // qui garantit que #dresseurId est utilisé partout
@@ -92,10 +100,12 @@ test('purchaseBalls : atomique, refuse si solde insuffisant', async () => {
     assert.equal(await bddService.purchaseBalls('g5', 'u5', 'hyperball', 10, 700), 1);
     assert.equal(await bddService.getMoneyForUser('g5', 'u5'), 500);
     assert.deepEqual(await bddService.getBallsForUser('g5', 'u5'), stocks({}));
+    assert.equal((await bddService.getDresseur('g5', 'u5')).ballsAchetees, 0, 'achat refusé : compteur inchangé');
 
     assert.equal(await bddService.purchaseBalls('g5', 'u5', 'pokeball', 5, 100), 0);
     assert.equal(await bddService.getMoneyForUser('g5', 'u5'), 400);
     assert.deepEqual(await bddService.getBallsForUser('g5', 'u5'), stocks({ pokeball: 5 }));
+    assert.equal((await bddService.getDresseur('g5', 'u5')).ballsAchetees, 5, 'compteur ballsAchetees alimenté');
 });
 
 test('captures : Pokédex et compteurs', async () => {
@@ -181,9 +191,14 @@ test('settleCasinoBet : atomique, refuse si solde insuffisant', async () => {
     assert.equal(await bddService.settleCasinoBet('gc', 'uc', 50, 500), 0);
     assert.equal(await bddService.getMoneyForUser('gc', 'uc'), 950);
 
+    // Statistiques : mises cumulées (50+50+50) et gains bruts (0+50+550)
+    assert.equal((await bddService.getDresseur('gc', 'uc')).argentMise, 150);
+    assert.equal((await bddService.getDresseur('gc', 'uc')).argentGagne, 600);
+
     // Mise supérieure au solde : refusée, aucun débit
     assert.equal(await bddService.settleCasinoBet('gc', 'uc', 1000, -1000), 1);
     assert.equal(await bddService.getMoneyForUser('gc', 'uc'), 950);
+    assert.equal((await bddService.getDresseur('gc', 'uc')).argentMise, 150, 'mise refusée non comptée');
 });
 
 test('casinoService.play : chaîne complète tirage + règlement atomique', async (t) => {
@@ -199,6 +214,50 @@ test('casinoService.play : chaîne complète tirage + règlement atomique', asyn
     assert.equal(result.gain, jackpot.multiplier * 10);
     assert.equal(result.netChange, jackpot.multiplier * 10 - 10);
     assert.equal(result.balance, 500 + result.netChange);
+});
+
+test('stats : échecs de capture, agrégats et top isolés par serveur', async () => {
+    await bddService.createNewUser('gs1', 'us1', 'js1');
+    await bddService.createNewUser('gs1', 'us2', 'js2');
+    await bddService.createNewUser('gs2', 'us1', 'autre-serveur');
+
+    await bddService.gainMoney('gs1', 'us1', 200);
+    await bddService.purchaseBalls('gs1', 'us1', 'pokeball', 3, 60);
+    await bddService.settleCasinoBet('gs1', 'us1', 40, -40);
+    await bddService.incrementerEchecCapture('gs1', 'us1');
+    await bddService.incrementerEchecCapture('gs1', 'us1');
+    await bddService.incrementerEchecCapture('gs1', 'us2');
+
+    const stats = await bddService.getStatsDresseurs('gs1');
+    assert.equal(stats.dresseurs, 2, 'dresseurs du serveur uniquement');
+    assert.equal(stats.argentGagne, 200, 'gains bruts (200 hors casino, 0 au casino)');
+    assert.equal(stats.ballsAchetees, 3);
+    assert.equal(stats.capturesEchouees, 3);
+    assert.equal(stats.argentMise, 40);
+    assert.equal(stats.argentEnCirculation, 500 + 200 - 60 - 40 + 500, 'somme des soldes');
+
+    // Isolation : l'autre serveur ne compte pas les stats de gs1
+    const statsAutre = await bddService.getStatsDresseurs('gs2');
+    assert.equal(statsAutre.dresseurs, 1);
+    assert.equal(statsAutre.argentGagne, 0);
+    assert.equal(statsAutre.capturesEchouees, 0);
+
+    // Top classé par argent accumulé (us1 devant us2)
+    const top = await bddService.getTopDresseurs('gs1', 5);
+    assert.equal(top.length, 2);
+    assert.equal(top[0].userId, 'us1');
+    assert.equal(top[0].argentGagne, 200);
+    assert.equal(top[0].ballsAchetees, 3);
+    assert.equal(top[0].capturesEchouees, 2);
+    assert.equal(top[0].argentMise, 40);
+    assert.equal(top[1].userId, 'us2');
+    assert.equal(top[1].argentGagne, 0);
+
+    // Base vide : agrégats à 0 sans erreur
+    const statsVide = await bddService.getStatsDresseurs('gs-inexistante');
+    assert.equal(statsVide.dresseurs, 0);
+    assert.equal(statsVide.argentGagne, 0);
+    assert.deepEqual(await bddService.getTopDresseurs('gs-inexistante', 5), []);
 });
 
 test('dresseur inexistant : valeurs par défaut sûres', async () => {

@@ -18,7 +18,8 @@ import { channelService } from '../services/channel/ChannelService.js';
  * 1. Ignore les messages du bot lui-même
  * 2. N'écoute que le channel principal du bot (channelService.channelId)
  * 3. Ignore l'auteur d'une réponse en attente (pendingResponses)
- * 4. Commandes sans enregistrement : !ping, !help, !jeVeuxJouer... (création de compte)
+ * 4. Commandes sans enregistrement : !ping, !help, !admin (permission par
+ *    liste d'IDs de la config), !jeVeuxJouer... (création de compte)
  * 5. Commandes réservées aux dresseurs enregistrés (vérification BDD) via un switch
  * @param {Object} message - Message Discord reçu
  * @returns {Promise<void>}
@@ -47,6 +48,13 @@ export async function handle(message) {
 
     if (message.content === '!help') {
         await commands.help.execute(message);
+        return;
+    }
+
+    // !admin : permission basée sur la liste d'IDs de la config (pas sur un
+    // compte enregistré) — routée avant la vérification d'enregistrement
+    if (message.content === '!admin' || message.content.startsWith('!admin ')) {
+        await commands.admin.execute(message);
         return;
     }
     
