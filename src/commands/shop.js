@@ -10,7 +10,6 @@
 import { Ball } from '../models/Ball.js';
 import { bddService } from '../services/bdd/BDDService.js';
 import { getConfig } from '../utils/configLoader.js';
-import { pendingResponses } from '../core/client.js';
 import { channelService } from '../services/channel/ChannelService.js';
 
 /**

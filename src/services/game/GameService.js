@@ -200,17 +200,17 @@ export class GameService {
         const gameConfig = this.config.game;
 
         const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
-        const { nomPoke, type_1, type_2 } = parsingPkmNomType1Type2(numPkm);
-        const pkm2Guess = new Pokemon(numPkm, nomPoke, type_1, type_2 || null);
+        const { nomPokeENG, type_1, type_2, nomPokeFR } = parsingPkmNomType1Type2(numPkm);
+        const pkm2Guess = new Pokemon(numPkm, nomPokeENG, type_1, type_2 || null);
         await sendGif(pkm2Guess.nom + " pokemon", message);
         const reward = this.getReward('guessMyType');
         const type1 = pkm2Guess.getType1();
         const type2 = pkm2Guess.getType2();
 
-        console.log(`User ${dresseurId} (${message.author.username}) launched guessMyType and picked ${pkm2Guess.nom} ${type1}${type2 !== null ? `/${type2}` : ''} to guess`);
+        console.log(`User ${dresseurId} (${message.author.username}) launched guessMyType and picked ${nomPokeFR} ${type1}${type2 !== null ? `/${type2}` : ''} to guess`);
 
         await channelService.replySafe(message,
-            `🎮 Un dresseur étrange surgit et envoie un ${pkm2Guess.nom}, il te met au défi de trouver son ou ses types ! ` +
+            `🎮 Un dresseur étrange surgit et envoie un ${nomPokeFR}, il te met au défi de trouver son ou ses types ! ` +
             `\nTu as ${gameConfig.guessMyTypeMaxAttempts} essais.` +
             `\n(Ensemble des types : normal / feu /eau / electrik / plante / glace / combat / poison / sol / vol / psy / insecte / roche / spectre / dragon / tenebres / acier / fee )` +
             `\nExemple d'une réponse : **!normal** ou **!normal/roche** (l'ordre en cas de double type n'est pas important)`
@@ -283,17 +283,17 @@ export class GameService {
         const gameConfig = this.config.game;
 
         const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
-        const { nomPoke, poids } = parsingPkmNomPoids(numPkm);
-        await sendGif(nomPoke + " pokemon", message);
+        const { nomPoke: nomPokeENG, poids, nomPokeFR } = parsingPkmNomPoids(numPkm);
+        await sendGif(nomPokeENG + " @pokemon", message);
         const reward = this.getReward('guessMyWeight');
         const expectedWeight = parseFloat(poids);
         const marge = expectedWeight * gameConfig.guessMyWeightTolerance;
         const margePourcent = Math.round(gameConfig.guessMyWeightTolerance * 100);
 
-        console.log(`User ${dresseurId} (${message.author.username}) launched guessMyWeight and picked ${nomPoke} ${poids} kg to guess (tolérance ±${marge} kg)`);
+        console.log(`User ${dresseurId} (${message.author.username}) launched guessMyWeight and picked ${nomPokeFR} ${poids} kg to guess (tolérance ±${marge} kg)`);
 
         await channelService.replySafe(message,
-            `🎮 Un dresseur étrange surgit et envoie un ${nomPoke}, il te met au défi d'estimer son poids ! ` +
+            `🎮 Un dresseur étrange surgit et envoie un ${nomPokeFR}, il te met au défi d'estimer son poids ! ` +
             `\nTu as ${gameConfig.guessMyWeightMaxAttempts} essais.` +
             `\nUne marge de ±${margePourcent} % autour du poids réel est acceptée.` +
             `\nExemple d'une réponse : **!6.9** ou **!6,9** (en kilogrammes, séparateur point ou virgule)`
