@@ -97,10 +97,12 @@ export async function handle(message) {
                 await commands.capture.execute(message, pendingResponses);
                 return;
             }
+            // !shop : accepte un type de ball en argument ("!shop pokeball5") ou rien
+            if (message.content === '!shop' || message.content.startsWith('!shop ')) {
+                await commands.shop.execute(message, pendingResponses);
+                return;
+            }
             switch (message.content) {
-                case '!shop':
-                    await commands.shop.execute(message, pendingResponses);
-                    break;
                 case '!work':
                     await commands.work.execute(message);
                     break;
