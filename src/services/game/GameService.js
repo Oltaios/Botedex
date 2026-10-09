@@ -296,7 +296,7 @@ export class GameService {
             `🎮 Un dresseur étrange surgit et envoie un ${nomPokeFR}, il te met au défi d'estimer son poids ! ` +
             `\nTu as ${gameConfig.guessMyWeightMaxAttempts} essais.` +
             `\nUne marge de ±${margePourcent} % autour du poids réel est acceptée.` +
-            `\nExemple d'une réponse : **!6.9** ou **!6,9** (en kilogrammes, séparateur point ou virgule)`
+            `\n\nExemple d'une réponse : \`<!6.9>\` ou \`<!6,9>\` (en kilogrammes, séparateur point ou virgule)`
         );
 
         const responseKey = `${message.channel.id}:${message.author.id}`;
