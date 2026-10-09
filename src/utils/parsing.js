@@ -81,11 +81,26 @@ export function parsingPkm(id) {
 export function parsingPkmNomType1Type2(id){
     var data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
     let array = CSVToArray(data, ',');
-    let nomPoke = array[id][nameENG]
+    let nomPokeENG = array[id][nameENG]
+    let nomPokeFR = array[id][nameFR]
     let type_1 = array[id][type1]
     let type_2 = array[id][type2]
     //console.log("type1 " + type_1 + " type2 " + type_2)
-    return {nomPoke, type_1, type_2};
+    return {nomPokeENG, type_1, type_2, nomPokeFR};
+}
+
+/**
+ * Retourne le nom et le poids d'un Pokemon
+ * @param {number} id - Numero du Pokemon (1 = 1ere ligne de donnees du CSV)
+ * @returns {Object} - { nomPoke: string, poids: string } (poids en kg)
+ */
+export function parsingPkmNomPoids(id){
+    var data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
+    let array = CSVToArray(data, ',');
+    let nomPokeENG = array[id][nameENG]
+    let nomPokeFR = array[id][nameFR]
+    let poids = array[id][weight_kg]
+    return {nomPokeENG, poids, nomPokeFR};
 }
 
 /**

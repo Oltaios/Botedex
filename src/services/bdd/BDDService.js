@@ -13,7 +13,9 @@
  *
  * Schéma du document dresseur (collection 'dresseurs') :
  *   { _id: { guildId, userId }, name, argent, nbrCapture, captureAvailable,
- *     gameAvailable, isWorking, workStartTime, pokeball, superball, hyperball,
+ *     gameTokens: { '<jeu>': Date du dernier jeton consommé }, isWorking,
+ *     workStartTime, argentGagne, ballsAchetees, capturesEchouees, argentMise,
+ *     un champ par type de ball de la config,
  *     '<numéroPokémon>' (1-151): 0|1, ... }
  *
  * Utilisation :
@@ -23,7 +25,7 @@
  */
 
 import { MongoClient } from 'mongodb';
-import { getDatabaseConfig } from '../../utils/configLoader.js';
+import { getConfig, getDatabaseConfig } from '../../utils/configLoader.js';
 
 export class BDDService {
     static #instance = null; // Instance unique (Singleton)
@@ -210,7 +212,7 @@ export class BDDService {
      * Vérifie si un champ booléen (0/1) est actif pour un dresseur
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
-     * @param {string} fieldToCheck - Champ à vérifier (ex: 'gameAvailable')
+     * @param {string} fieldToCheck - Champ à vérifier (ex: 'captureAvailable')
      * @returns {Promise<boolean>} - true si le champ vaut 1, false sinon
      */
     async checkIfAvailable(guildId, userId, fieldToCheck) {
@@ -250,6 +252,7 @@ export class BDDService {
 
     /**
      * Ajoute de l'argent à un dresseur (incrément atomique)
+     * Alimente aussi le compteur de statistique argentGagne (total accumulé)
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {number} amount - Montant à ajouter
@@ -258,7 +261,7 @@ export class BDDService {
     async gainMoney(guildId, userId, amount) {
         await this.db.collection(this.#dresseursCollection).updateOne(
             { _id: this.#dresseurId(guildId, userId) },
-            { $inc: { argent: amount } }
+            { $inc: { argent: amount, argentGagne: amount } }
         );
     }
 
@@ -285,6 +288,7 @@ export class BDDService {
 
     /**
      * Achat de balls atomique : débite le prix et crédite les balls
+     * (alimente aussi le compteur de statistique ballsAchetees)
      * en une seule opération indivisible
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
@@ -296,7 +300,28 @@ export class BDDService {
     async purchaseBalls(guildId, userId, ballType, quantity, totalPrice) {
         const result = await this.db.collection(this.#dresseursCollection).updateOne(
             { _id: this.#dresseurId(guildId, userId), argent: { $gte: totalPrice } },
-            { $inc: { argent: -totalPrice, [ballType]: quantity } }
+            { $inc: { argent: -totalPrice, [ballType]: quantity, ballsAchetees: quantity } }
+        );
+        return result.matchedCount === 0 ? 1 : 0;
+    }
+
+    /**
+     * Règle un pari de casino de façon atomique : applique la variation nette
+     * (gain - mise) en une seule opération indivisible. Alimente aussi les
+     * compteurs de statistiques : argentMise (total misé) et argentGagne
+     * (partie gain brut du tirage, 0 si perte sèche). La condition de solde
+     * est dans le filtre : impossible de passer sous 0 même si le solde a
+     * changé depuis la vérification en amont
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @param {number} bet - Mise engagée (>= 0)
+     * @param {number} netChange - Variation nette du solde (>= -bet)
+     * @returns {Promise<number>} - 0 si pari réglé, 1 si solde insuffisant
+     */
+    async settleCasinoBet(guildId, userId, bet, netChange) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId), argent: { $gte: bet } },
+            { $inc: { argent: netChange, argentMise: bet, argentGagne: Math.max(0, netChange + bet) } }
         );
         return result.matchedCount === 0 ? 1 : 0;
     }
@@ -316,13 +341,18 @@ export class BDDService {
             argent: 500,
             nbrCapture: 0,
             captureAvailable: 1,
-            gameAvailable: 1,
             isWorking: 0,
-            pokeball: 0,
-            superball: 0,
-            hyperball: 0,
-            workStartTime: null
+            workStartTime: null,
+            // Compteurs de statistiques (suivi de l'activité du dresseur)
+            argentGagne: 0,
+            ballsAchetees: 0,
+            capturesEchouees: 0,
+            argentMise: 0
         };
+        // Ajoute un champ de stock par type de ball de la config (0 par défaut)
+        for (const ballType of Object.keys(getConfig().balls)) {
+            row[ballType] = 0;
+        }
         // Ajoute les champs pour les Pokémon 1-151 (génération 1 du CSV)
         for (let i = 1; i <= 151; i++) {
             row[i] = 0;
@@ -368,6 +398,24 @@ export class BDDService {
     }
 
     /**
+     * Retourne tous les dresseurs actuellement au travail (isWorking = 1)
+     * Projection sur les seuls champs utiles : évite de charger tout le
+     * document (151 champs Pokédex) pour chaque dresseur
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @returns {Promise<Array<Object>>} - Dresseurs au travail :
+     *          [{ _id: { guildId, userId }, name, workStartTime }]
+     */
+    async getWorkingDresseurs(guildId) {
+        const filter = guildId
+            ? { '_id.guildId': guildId, isWorking: 1 }
+            : { isWorking: 1 };
+        return await this.db.collection(this.#dresseursCollection)
+            .find(filter, { projection: { _id: 1, name: 1, workStartTime: 1 } })
+            .toArray();
+    }
+
+    /**
      * Retourne l'argent d'un dresseur
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
@@ -382,11 +430,12 @@ export class BDDService {
      * Retourne le stock de balls d'un dresseur
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
-     * @returns {Promise<Array<number>>} - [pokeball, superball, hyperball]
+     * @returns {Promise<Array<number>>} - Un stock par type de ball de la config (ordre de la config)
      */
     async getBallsForUser(guildId, userId) {
         const row = await this.getDresseur(guildId, userId);
-        return row ? [row.pokeball, row.superball, row.hyperball] : [0, 0, 0];
+        // Un stock par type de ball de la config, dans l'ordre de la config
+        return Object.keys(getConfig().balls).map(ballType => row?.[ballType] || 0);
     }
 
     /**
@@ -407,25 +456,41 @@ export class BDDService {
     }
 
     /**
-     * Consomme le jeton de jeu quotidien d'un dresseur
+     * Retourne la date du dernier jeton de jeu consommé pour un jeu donné
+     * Un jeton est consommé à la première réponse d'un mini-jeu ; sa
+     * disponibilité se calcule par comparaison avec l'heure courante
+     * (GameService.isGameAvailable), sans reset planifié
+     * Projection sur le seul champ utile : évite de charger tout le
+     * document (151 champs Pokédex)
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
-     * @returns {Promise<void>}
+     * @param {string} gameType - Type de jeu (clé dans gameTokens, ex: 'type')
+     * @returns {Promise<Date|null>} - Date du dernier jeton consommé, ou null
+     *          si le dresseur n'existe pas / n'a jamais joué à ce jeu
      */
-    async consumeGameAvailable(guildId, userId) {
-        await this.updateOneFieldForOneUser(guildId, userId, 'gameAvailable', 0);
+    async getGameLastPlayedAt(guildId, userId, gameType) {
+        const row = await this.db.collection(this.#dresseursCollection).findOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { projection: { _id: 0, gameTokens: 1 } }
+        );
+        const lastPlayedAt = row?.gameTokens?.[gameType] ?? null;
+        return lastPlayedAt !== null ? new Date(lastPlayedAt) : null;
     }
 
     /**
-     * Réinitialise les jetons de jeu des dresseurs d'un serveur (mise à 1)
-     * Appelé à minuit via GameService.startDailyResetSchedule()
-     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
-     *        les guilds (mono-serveur, sans isolation)
+     * Consomme le jeton de jeu d'un dresseur pour un jeu donné : enregistre
+     * la date de consommation dans la map gameTokens
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @param {string} gameType - Type de jeu (clé dans gameTokens, ex: 'type')
+     * @param {Date} date - Date de consommation du jeton
      * @returns {Promise<void>}
      */
-    async resetGameAvailable(guildId) {
-        await this.updateMany(guildId, 'gameAvailable', 1);
-        console.log("Reset des tokens game effectué");
+    async recordGamePlayed(guildId, userId, gameType, date) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { $set: { [`gameTokens.${gameType}`]: date } }
+        );
     }
 
     /**
@@ -443,6 +508,76 @@ export class BDDService {
             ? { '_id.guildId': guildId, isWorking: 1 }
             : { isWorking: 1 };
         await this.db.collection(this.#dresseursCollection).updateMany(filter, { $set: { isWorking: 0 } });
+    }
+
+    /**
+     * Enregistre un échec de capture pour un dresseur (compteur de statistique)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<void>} - Sans effet si le dresseur n'existe pas
+     */
+    async incrementerEchecCapture(guildId, userId) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { $inc: { capturesEchouees: 1 } }
+        );
+    }
+
+    /**
+     * Retourne les statistiques agrégées des dresseurs d'un serveur :
+     * nombre de dresseurs, argent total accumulé (gains bruts), balls
+     * achetées, échecs de capture, argent misé au casino et argent
+     * actuellement en circulation (somme des soldes)
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @returns {Promise<Object>} - { dresseurs, argentGagne, ballsAchetees,
+     *          capturesEchouees, argentMise, argentEnCirculation }
+     */
+    async getStatsDresseurs(guildId) {
+        const match = guildId ? { '_id.guildId': guildId } : {};
+        const [stats] = await this.db.collection(this.#dresseursCollection).aggregate([
+            { $match: match },
+            { $group: {
+                _id: null,
+                dresseurs: { $sum: 1 },
+                argentGagne: { $sum: '$argentGagne' },
+                ballsAchetees: { $sum: '$ballsAchetees' },
+                capturesEchouees: { $sum: '$capturesEchouees' },
+                argentMise: { $sum: '$argentMise' },
+                argentEnCirculation: { $sum: '$argent' }
+            } }
+        ]).toArray();
+        return stats ?? { dresseurs: 0, argentGagne: 0, ballsAchetees: 0, capturesEchouees: 0, argentMise: 0, argentEnCirculation: 0 };
+    }
+
+    /**
+     * Retourne les meilleurs dresseurs d'un serveur, classés par argent
+     * accumulé, avec leurs compteurs de statistiques (projection réduite,
+     * sans les 151 champs Pokédex)
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @param {number} [limit=5] - Nombre maximal de dresseurs retournés
+     * @returns {Promise<Array<Object>>} - [{ userId, name, argent,
+     *          argentGagne, ballsAchetees, capturesEchouees, argentMise }]
+     */
+    async getTopDresseurs(guildId, limit = 5) {
+        const filter = guildId ? { '_id.guildId': guildId } : {};
+        return await this.db.collection(this.#dresseursCollection)
+            .find(filter, {
+                projection: {
+                    _id: 0,
+                    userId: '$_id.userId',
+                    name: 1,
+                    argent: 1,
+                    argentGagne: 1,
+                    ballsAchetees: 1,
+                    capturesEchouees: 1,
+                    argentMise: 1
+                }
+            })
+            .sort({ argentGagne: -1 })
+            .limit(limit)
+            .toArray();
     }
 }
 

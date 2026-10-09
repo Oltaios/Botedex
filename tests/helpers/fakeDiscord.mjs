@@ -32,21 +32,28 @@ export function fakeChannel({ id = 'chan-test', collectorFactory } = {}) {
  * Crée un faux MessageCollector (choix de ball, réponses de jeu...)
  * Les handlers enregistrés via on() sont déclenchés manuellement par emit(),
  * qui attend la fin des handlers asynchrones.
+ * collected simule la Collection de discord.js : chaque emit('collect')
+ * incrémente sa taille (utilisée pour décompter les essais d'un jeu).
+ * Les handlers 'end' reçoivent (collected, endReason) comme discord.js.
  */
 export function fakeCollector() {
     const handlers = {};
     const collector = {
         endReason: null,
+        collected: { size: 0 },
         on: (event, callback) => {
             handlers[event] = callback;
             return collector;
         },
         stop: (reason = 'user') => {
             collector.endReason = reason;
-            handlers.end?.();
+            handlers.end?.(collector.collected, reason);
         },
         resetTimer: () => {},
-        emit: (event, arg) => handlers[event]?.(arg)
+        emit: (event, arg) => {
+            if (event === 'collect') collector.collected.size++;
+            return handlers[event]?.(arg, collector.endReason);
+        }
     };
     return collector;
 }

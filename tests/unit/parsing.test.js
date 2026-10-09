@@ -72,8 +72,8 @@ test('name reste anglais et nameFR français (échantillon de garde)', () => {
 });
 
 test('contrat parsingPkmNomType1Type2 : nom EN et types FR', () => {
-    assert.deepEqual(parsingPkmNomType1Type2(25), { nomPoke: 'Pikachu', type_1: 'electrik', type_2: '' });
-    assert.deepEqual(parsingPkmNomType1Type2(6), { nomPoke: 'Charizard', type_1: 'feu', type_2: 'vol' });
+    assert.deepEqual(parsingPkmNomType1Type2(25), { nomPokeENG: 'Pikachu', type_1: 'electrik', type_2: '', nomPokeFR: 'Pikachu' });
+    assert.deepEqual(parsingPkmNomType1Type2(6), { nomPokeENG: 'Charizard', type_1: 'feu', type_2: 'vol', nomPokeFR: 'Dracaufeu' });
 });
 
 test('types du CSV : 18 types français, aucun reste anglais', () => {

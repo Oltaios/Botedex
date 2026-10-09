@@ -22,9 +22,9 @@ export async function sendGif(keyword, message = null) {
     const send = (content) => message ? message.reply(content) : channelService.sendMessage(content);
     try {
         console.log("Je cherche un gif avec le keyword " + keyword);
+        console.log("encodeURIComponent =  " + encodeURIComponent(keyword));
         // Encodage du keyword pour éviter les problèmes d'URL
-        //const searchUrl = `https://api.giphy.com/v1/gifs/random?tag=${encodeURIComponent(keyword)}&api_key=${GIPHY_API_KEY}&rating=pg-13`;
-        const searchUrl = `https://api.giphy.com/v1/stickers/random?tag=${encodeURIComponent(keyword)}&api_key=${GIPHY_API_KEY}&rating=pg-13`;
+        const searchUrl = `https://api.giphy.com/v1/stickers/search?q=${encodeURIComponent(keyword)}&api_key=${GIPHY_API_KEY}&rating=pg-13`;
         const response = await fetch(searchUrl);
 
         if (!response.ok) {
@@ -33,14 +33,16 @@ export async function sendGif(keyword, message = null) {
 
         const data = await response.json();
 
-        if (!data.data || !data.data.images) {
+        // /stickers/search renvoie un tableau de résultats
+        if (!Array.isArray(data.data) || data.data.length === 0) {
             console.log("[GIF] Réponse de GIPHY : ", data);
             await send("Aucun GIF trouvé pour ce mot-clé. Essaie autre chose !");
             return;
         }
 
-        // Récupère l'URL du GIF en haute qualité
-        const gifUrl = data.data.images.original.url;
+        // Récupère l'URL du sticker en haute qualité
+        const gif = data.data[Math.floor(Math.random() * data.data.length)];
+        const gifUrl = gif.images.original.url;
         await send(gifUrl);
 
     } catch (error) {

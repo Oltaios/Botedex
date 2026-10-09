@@ -18,7 +18,8 @@ import { channelService } from '../services/channel/ChannelService.js';
  * 1. Ignore les messages du bot lui-même
  * 2. N'écoute que le channel principal du bot (channelService.channelId)
  * 3. Ignore l'auteur d'une réponse en attente (pendingResponses)
- * 4. Commandes sans enregistrement : !ping, !help, !jeVeuxJouer... (création de compte)
+ * 4. Commandes sans enregistrement : !ping, !help, !admin (permission par
+ *    liste d'IDs de la config), !jeVeuxJouer... (création de compte)
  * 5. Commandes réservées aux dresseurs enregistrés (vérification BDD) via un switch
  * @param {Object} message - Message Discord reçu
  * @returns {Promise<void>}
@@ -47,6 +48,13 @@ export async function handle(message) {
 
     if (message.content === '!help') {
         await commands.help.execute(message);
+        return;
+    }
+
+    // !admin : permission basée sur la liste d'IDs de la config (pas sur un
+    // compte enregistré) — routée avant la vérification d'enregistrement
+    if (message.content === '!admin' || message.content.startsWith('!admin ')) {
+        await commands.admin.execute(message);
         return;
     }
     
@@ -79,16 +87,22 @@ export async function handle(message) {
         
         // Route vers les commandes spécifiques
         try {
+            // !game : accepte un type de jeu en argument ("!game type") ou rien
+            if (message.content === '!game' || message.content.startsWith('!game ')) {
+                await commands.game.execute(message);
+                return;
+            }
+            // !capture : accepte un type de ball en argument ("!capture pokeball") ou rien
+            if (message.content === '!capture' || message.content.startsWith('!capture ')) {
+                await commands.capture.execute(message, pendingResponses);
+                return;
+            }
+            // !shop : accepte un type de ball en argument ("!shop pokeball5") ou rien
+            if (message.content === '!shop' || message.content.startsWith('!shop ')) {
+                await commands.shop.execute(message, pendingResponses);
+                return;
+            }
             switch (message.content) {
-                case '!shop':
-                    await commands.shop.execute(message, pendingResponses);
-                    break;
-                case '!capture':
-                    await commands.capture.execute(message, pendingResponses);
-                    break;
-                case '!game':
-                    await commands.game.execute(message);
-                    break;
                 case '!work':
                     await commands.work.execute(message);
                     break;
@@ -100,6 +114,9 @@ export async function handle(message) {
                     break;
                 case '!pokedex':
                     await commands.pokedex.execute(message);
+                    break;
+                case '!casino':
+                    await commands.casino.execute(message, pendingResponses);
                     break;
                 default:
                     // Commande inconnue

@@ -28,6 +28,9 @@ export class Ball {
         }
         
         // Applique les valeurs depuis la config
+        // Nom d'affichage (première lettre en majuscule) : "nom" de la config,
+        // repli sur le type si absent
+        this.nom = ballConfig.nom ?? name;
         this.rate = ballConfig.rate;
         this.price = ballConfig.price;
     }
@@ -54,5 +57,13 @@ export class Ball {
      */
     getPrice() {
         return this.price;
+    }
+
+    /**
+     * Retourne le nom d'affichage de la ball (ex: "Pokeball", "MaitreBall")
+     * @returns {string}
+     */
+    getNom() {
+        return this.nom;
     }
 }
