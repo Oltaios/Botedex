@@ -202,7 +202,7 @@ export class GameService {
         const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
         const { nomPokeENG, type_1, type_2, nomPokeFR } = parsingPkmNomType1Type2(numPkm);
         const pkm2Guess = new Pokemon(numPkm, nomPokeENG, type_1, type_2 || null);
-        await sendGif(pkm2Guess.nom + " pokemon", message);
+        await sendGif(pkm2Guess.nom + " @pokemon", message);
         const reward = this.getReward('guessMyType');
         const type1 = pkm2Guess.getType1();
         const type2 = pkm2Guess.getType2();
@@ -283,7 +283,7 @@ export class GameService {
         const gameConfig = this.config.game;
 
         const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
-        const { nomPoke: nomPokeENG, poids, nomPokeFR } = parsingPkmNomPoids(numPkm);
+        const { nomPokeENG, poids, nomPokeFR } = parsingPkmNomPoids(numPkm);
         await sendGif(nomPokeENG + " @pokemon", message);
         const reward = this.getReward('guessMyWeight');
         const expectedWeight = parseFloat(poids);
