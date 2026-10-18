@@ -45,6 +45,9 @@
     "guessMyWeightReward": 80,
     "guessMyNameReward": 50
   },
+  "egg": {
+    "capturesRequises": 1
+  },
   "casino": {
     "minBet": 1,
     "maxBet": 500,

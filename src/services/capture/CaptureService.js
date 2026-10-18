@@ -25,6 +25,7 @@ import  { pendingResponses } from '../../core/client.js'
 import { parsingPkm } from '../../utils/parsing.js';
 import { PhrasesAleatoires } from '../../utils/phrasesAleatoires.js';
 import { channelService } from '../channel/ChannelService.js';
+import { eggService } from '../egg/EggService.js';
 
 
 export class CaptureService {
@@ -50,6 +51,13 @@ export class CaptureService {
             "**Clic !**\nVous avez déjà capturé ce {nomPoke}, vous décidez de vendre ses organes à la Team Rocket et gagnez {reward}$, bien joué !",
             "**Clic !**\nDoublon de {nomPoke} ! La Team Rocket rachète le second à {reward}$, affaire classée.",
             "**Clic !**\nEncore un {nomPoke}... La Team Rocket envoie un conteneur frigorifique et te file {reward}$ pour ta discrétion."
+        ]);
+        // Messages d'éclosion d'œuf : chaque variante garde le mot-clé "éclos"
+        // attendu par les tests d'intégration
+        this.messagesEclosion = new PhrasesAleatoires([
+            "🥚 **Crac !** Ton œuf a éclos : un {nomPoke} en sort et rejoint ton Pokédex !",
+            "🥚 **Crac !** Pendant que tu capturais, ton œuf a éclos : bonjour {nomPoke} !",
+            "🥚 **Crac !** Ton œuf a éclos, et c'est un {nomPoke} qui pointe le bout de son nez !"
         ]);
     }
 
@@ -248,6 +256,19 @@ export class CaptureService {
                 // Nouveau Pokémon !
                 await channelService.replySafe(message, this.messagesNouveau.piocher({ nomPoke: pokemonAvailable[2] }));
                 await bddService.registerNewCapture(guildId, userId, numPkm);
+            }
+
+            // Œuf : chaque capture réussie fait progresser l'éclosion ;
+            // si le seuil est atteint, un Pokémon aléatoire est offert
+            const numEclos = await eggService.onCapture(guildId, userId);
+            if (numEclos !== null) {
+                const pokemonEclos = parsingPkm(numEclos);
+                // Nom et numéro du Pokémon obtenus en gras (ex: **Roucool [16]**)
+                const nomEclos = `**${pokemonEclos[2]} [${numEclos}]**`;
+                await channelService.replySafe(
+                    message,
+                    this.messagesEclosion.piocher({ nomPoke: nomEclos })
+                );
             }
         }
         else{

@@ -102,6 +102,16 @@ export async function handle(message) {
                 await commands.shop.execute(message, pendingResponses);
                 return;
             }
+            // !egg : accepte une action en argument ("!egg obtenir") ou rien
+            if (message.content === '!egg' || message.content.startsWith('!egg ')) {
+                await commands.egg.execute(message);
+                return;
+            }
+            // !classement : accepte un critère en argument ("!classement captures") ou rien
+            if (message.content === '!classement' || message.content.startsWith('!classement ')) {
+                await commands.classement.execute(message);
+                return;
+            }
             switch (message.content) {
                 case '!work':
                     await commands.work.execute(message);

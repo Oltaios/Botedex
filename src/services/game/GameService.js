@@ -212,7 +212,7 @@ export class GameService {
         await channelService.replySafe(message,
             `🎮 Un dresseur étrange surgit et envoie un ${nomPokeFR}, il te met au défi de trouver son ou ses types ! ` +
             `\nTu as ${gameConfig.guessMyTypeMaxAttempts} essais.` +
-            `\n(Ensemble des types : normal / feu /eau / electrik / plante / glace / combat / poison / sol / vol / psy / insecte / roche / spectre / dragon / tenebres / acier / fee )` +
+            `\n(Ensemble des types : normal / feu /eau / electrik / plante / glace / combat / poison / sol / vol / psy / insecte / roche / spectre / dragon / acier / fee )` +
             `\nExemple d'une réponse : **!normal** ou **!normal/roche** (l'ordre en cas de double type n'est pas important)`
         );
 

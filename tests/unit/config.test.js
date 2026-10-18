@@ -27,6 +27,10 @@ test('gameConfig : structure requise', () => {
     assert.ok(Number.isFinite(gameConfig.economy.duplicateCaptureReward), 'economy.duplicateCaptureReward requis');
     assert.ok(Number.isInteger(gameConfig.game.numberOfPokemon), 'game.numberOfPokemon requis');
     assert.ok(
+        Number.isInteger(gameConfig.egg?.capturesRequises) && gameConfig.egg.capturesRequises > 0,
+        'egg.capturesRequises requis (entier positif)'
+    );
+    assert.ok(
         gameConfig.spawn.minIntervalMinutes <= gameConfig.spawn.maxIntervalMinutes,
         'spawn.minIntervalMinutes <= maxIntervalMinutes'
     );
