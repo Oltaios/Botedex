@@ -112,3 +112,73 @@ test('commande inconnue après enregistrement', async () => {
     await handle(message);
     assert.ok(message.replies.some((r) => String(r).includes('Commande inconnue')));
 });
+
+test('!classement : pokedex par défaut, captures en argument, critère inconnu refusé', async () => {
+    // Second dresseur avec une capture distincte + un doublon revendu
+    const inscription = fakeMessage({
+        authorId: 'u-chasseur',
+        username: 'chasseur',
+        guildId: GUILD,
+        content: INSCRIPTION
+    });
+    await handle(inscription);
+    assert.ok(inscription.replies.some((r) => String(r).includes('Compte créé')));
+    await bddService.registerNewCapture(GUILD, 'u-chasseur', 25);
+    await bddService.incrementCaptureCount(GUILD, 'u-chasseur');
+
+    // Sans argument : critère pokedex, chasseur (1) devant toto (0)
+    const parDefaut = fakeMessage({ authorId: 'u-inscrit', guildId: GUILD, content: '!classement' });
+    await handle(parDefaut);
+    const replyDefaut = String(parDefaut.replies[0] ?? '');
+    assert.ok(replyDefaut.includes('Pokémon capturés'), 'critère pokedex par défaut');
+    assert.ok(replyDefaut.indexOf('chasseur') < replyDefaut.indexOf('toto'), 'tri par score décroissant');
+    assert.ok(replyDefaut.includes('1 Pokémon'), 'score du chasseur');
+
+    // Argument captures : doublons inclus (2 captures pour le chasseur)
+    const parCaptures = fakeMessage({ authorId: 'u-inscrit', guildId: GUILD, content: '!classement captures' });
+    await handle(parCaptures);
+    const replyCaptures = String(parCaptures.replies[0] ?? '');
+    assert.ok(replyCaptures.includes('captures effectuées'), 'critère captures');
+    assert.ok(replyCaptures.includes('2 captures'), 'doublons comptés');
+
+    // Critère inconnu : usage rappelé
+    const mauvais = fakeMessage({ authorId: 'u-inscrit', guildId: GUILD, content: '!classement bidule' });
+    await handle(mauvais);
+    assert.ok(mauvais.replies.some((r) => String(r).includes('Critère inconnu')));
+});
+
+test('!classement egg : classement par œufs éclos', async () => {
+    // u-chasseur fait éclore un œuf : 1 éclosion contre 0 pour les autres
+    await bddService.giveEgg(GUILD, 'u-chasseur');
+    for (let i = 0; i < 10; i++) {
+        await bddService.progressEgg(GUILD, 'u-chasseur');
+    }
+    assert.equal(await bddService.hatchEgg(GUILD, 'u-chasseur', 42, 10), 0);
+
+    const message = fakeMessage({ authorId: 'u-inscrit', guildId: GUILD, content: '!classement egg' });
+    await handle(message);
+    const reply = String(message.replies[0] ?? '');
+    assert.ok(reply.includes('œufs éclos'), 'critère egg');
+    assert.ok(reply.indexOf('chasseur') < reply.indexOf('toto'), 'le dresseur avec une éclosion mène');
+    assert.ok(reply.includes('1 œuf éclos'), 'affichage au singulier pour un seul œuf');
+});
+
+test('!egg : état sans œuf, obtenir, état flou, action inconnue', async () => {
+    await bddService.createNewUser(GUILD, 'u-oeuf-routage', 'oeufiste');
+
+    const sansOeuf = fakeMessage({ authorId: 'u-oeuf-routage', guildId: GUILD, content: '!egg' });
+    await handle(sansOeuf);
+    assert.ok(sansOeuf.replies.some((r) => String(r).includes("pas d'œuf")), 'sans œuf : orienté vers !egg obtenir');
+
+    const obtenir = fakeMessage({ authorId: 'u-oeuf-routage', guildId: GUILD, content: '!egg obtenir' });
+    await handle(obtenir);
+    assert.ok(obtenir.replies.some((r) => String(r).includes('Professeur Chen')), 'œuf confié par le Professeur Chen');
+
+    const avecOeuf = fakeMessage({ authorId: 'u-oeuf-routage', guildId: GUILD, content: '!egg' });
+    await handle(avecOeuf);
+    assert.ok(avecOeuf.replies.some((r) => String(r).includes('éclosion')), 'état flou affiché sans décompte');
+
+    const inconnu = fakeMessage({ authorId: 'u-oeuf-routage', guildId: GUILD, content: '!egg casser' });
+    await handle(inconnu);
+    assert.ok(inconnu.replies.some((r) => String(r).includes('Action inconnue')), 'action inconnue refusée');
+});

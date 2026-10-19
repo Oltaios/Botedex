@@ -15,6 +15,8 @@
  *   { _id: { guildId, userId }, name, argent, nbrCapture, captureAvailable,
  *     gameTokens: { '<jeu>': Date du dernier jeton consommé }, isWorking,
  *     workStartTime, argentGagne, ballsAchetees, capturesEchouees, argentMise,
+ *     eggActive, eggCaptures, oeufsEclos (œuf : en cours, captures effectuées
+ *     depuis l'obtention, éclosions cumulées),
  *     un champ par type de ball de la config,
  *     '<numéroPokémon>' (1-151): 0|1, ... }
  *
@@ -347,7 +349,12 @@ export class BDDService {
             argentGagne: 0,
             ballsAchetees: 0,
             capturesEchouees: 0,
-            argentMise: 0
+            argentMise: 0,
+            // Œuf : en cours (0 = aucun), captures effectuées depuis son obtention
+            // et éclosions cumulées (statistique de classement)
+            eggActive: 0,
+            eggCaptures: 0,
+            oeufsEclos: 0
         };
         // Ajoute un champ de stock par type de ball de la config (0 par défaut)
         for (const ballType of Object.keys(getConfig().balls)) {
@@ -578,6 +585,132 @@ export class BDDService {
             .sort({ argentGagne: -1 })
             .limit(limit)
             .toArray();
+    }
+    /**
+     * Retourne le classement des dresseurs d'un serveur pour un critère donné :
+     * 'pokedex' (nombre de Pokémon distincts capturés), 'captures' (nombre
+     * de captures effectuées, doublons inclus, via le compteur nbrCapture)
+     * ou 'egg' (nombre d'œufs éclos, via le compteur oeufsEclos).
+     * Le critère 'pokedex' est calculé côté serveur en comptant les champs
+     * '<numéro>' (1-151) à 1 : les autres champs numériques du document
+     * (argent, compteurs) ont des clés non numériques, la regex suffit
+     * donc à isoler le Pokédex sans charger les 151 champs côté bot
+     * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
+     *        les guilds (mono-serveur, sans isolation)
+     * @param {string} [critere='pokedex'] - Critère de tri : 'pokedex', 'captures' ou 'egg'
+     * @param {number} [limit=10] - Nombre maximal de dresseurs retournés
+     * @returns {Promise<Array<Object>>} - [{ userId, name, score }] trié par
+     *          score décroissant puis par nom (égalités déterministes)
+     */
+    async getClassementDresseurs(guildId, critere = 'pokedex', limit = 10) {
+        const filter = guildId ? { '_id.guildId': guildId } : {};
+        const score = critere === 'captures'
+            ? '$nbrCapture'
+            : critere === 'egg'
+                // Compteur absent des documents créés avant la feature : 0
+                ? { $ifNull: ['$oeufsEclos', 0] }
+                : {
+                    $size: {
+                        $filter: {
+                            input: { $objectToArray: '$$ROOT' },
+                            as: 'champ',
+                            cond: {
+                                $and: [
+                                    { $eq: ['$$champ.v', 1] },
+                                    { $regexMatch: { input: '$$champ.k', regex: '^[0-9]+$' } }
+                                ]
+                            }
+                        }
+                    }
+                };
+        return await this.db.collection(this.#dresseursCollection).aggregate([
+            { $match: filter },
+            { $addFields: { score } },
+            { $sort: { score: -1, name: 1 } },
+            { $limit: limit },
+            { $project: { _id: 0, userId: '$_id.userId', name: 1, score: 1 } }
+        ]).toArray();
+    }
+    // ========== OEUF (INCUBATION PAR CAPTURES) ==========
+
+    /**
+     * Confie un œuf à un dresseur : passe eggActive à 1 et repart de zéro
+     * capture. La condition "pas d'œuf en cours" est dans le filtre
+     * ($ne et non $eq : les documents créés avant la feature n'ont pas le
+     * champ eggActive) : deux appels simultanés ne peuvent pas donner
+     * deux œufs, et un œuf en cours ne peut pas être écrasé
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<number>} - 0 si l'œuf est confié, 1 si refus
+     *          (œuf déjà en incubation ou dresseur inexistant)
+     */
+    async giveEgg(guildId, userId) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId), eggActive: { $ne: 1 } },
+            { $set: { eggActive: 1, eggCaptures: 0 } }
+        );
+        return result.matchedCount === 0 ? 1 : 0;
+    }
+
+    /**
+     * Retourne l'état de l'œuf d'un dresseur (projection réduite)
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<Object|null>} - { eggActive, eggCaptures }, ou null
+     *          si le dresseur n'existe pas
+     */
+    async getEggState(guildId, userId) {
+        return await this.db.collection(this.#dresseursCollection).findOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { projection: { _id: 0, eggActive: 1, eggCaptures: 1 } }
+        );
+    }
+
+    /**
+     * Fait progresser l'œuf d'une capture (incrément atomique) et retourne
+     * l'état après incrément : la valeur d'eggCaptures lue est celle de ce
+     * dresseur, même si deux captures arrivent simultanément
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @returns {Promise<Object|null>} - { eggActive, eggCaptures } après
+     *          incrément, ou null si aucun œuf n'est en incubation
+     */
+    async progressEgg(guildId, userId) {
+        // Driver v4 : findOneAndUpdate retourne l'enveloppe { value }, pas le
+        // document directement (v5+) — on normalise vers doc|null
+        const result = await this.db.collection(this.#dresseursCollection).findOneAndUpdate(
+            { _id: this.#dresseurId(guildId, userId), eggActive: 1 },
+            { $inc: { eggCaptures: 1 } },
+            { returnDocument: 'after', projection: { _id: 0, eggActive: 1, eggCaptures: 1 } }
+        );
+        return result?.value ?? null;
+    }
+
+    /**
+     * Fait éclore l'œuf : marque le Pokémon numPkm comme capturé dans le
+     * Pokédex, réinitialise l'œuf et incrémente le compteur d'œufs éclos
+     * (oeufsEclos, statistique de classement), en une seule opération
+     * atomique. Les
+     * conditions "œuf en cours" et "seuil atteint" sont dans le filtre :
+     * l'éclosion est tentée après chaque capture, seul le premier appel
+     * au seuil gagne, pas de double Pokémon offert
+     * @param {string} guildId - ID du serveur Discord (isolation des données)
+     * @param {string} userId - ID Discord du dresseur
+     * @param {number} numPkm - Numéro du Pokémon issu de l'œuf (déjà tiré)
+     * @param {number} capturesRequises - Seuil d'éclosion (config egg)
+     * @returns {Promise<number>} - 0 si l'œuf a éclos, 1 si refus
+     *          (pas d'œuf ou seuil non atteint)
+     */
+    async hatchEgg(guildId, userId, numPkm, capturesRequises) {
+        const result = await this.db.collection(this.#dresseursCollection).updateOne(
+            {
+                _id: this.#dresseurId(guildId, userId),
+                eggActive: 1,
+                eggCaptures: { $gte: capturesRequises }
+            },
+            { $set: { eggActive: 0, eggCaptures: 0, [numPkm]: 1 }, $inc: { oeufsEclos: 1 } }
+        );
+        return result.matchedCount === 0 ? 1 : 0;
     }
 }
 

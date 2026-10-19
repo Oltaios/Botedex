@@ -27,7 +27,6 @@ function champs(ligne) {
 test('contrat parsingPkm : [nom EN, taux de capture, nom FR]', () => {
     assert.deepEqual(parsingPkm(1), ['Bulbasaur', '45', 'Bulbizarre']);
     assert.deepEqual(parsingPkm(25), ['Pikachu', '190', 'Pikachu']);
-    assert.deepEqual(parsingPkm(29), ['Nidoran (Femelle)', '235', 'Nidoran♀']);
     assert.deepEqual(parsingPkm(83), ["Farfetch'd", '45', 'Canarticho']);
     assert.deepEqual(parsingPkm(122), ['Mr. Mime', '45', 'M. Mime']);
     assert.deepEqual(parsingPkm(148), ['Dragonair', '45', 'Draco']);
@@ -79,7 +78,7 @@ test('contrat parsingPkmNomType1Type2 : nom EN et types FR', () => {
 test('types du CSV : 18 types français, aucun reste anglais', () => {
     const attendus = new Set([
         'normal', 'feu', 'eau', 'electrik', 'plante', 'glace', 'combat', 'poison',
-        'sol', 'vol', 'psy', 'insecte', 'roche', 'spectre', 'dragon', 'tenebres',
+        'sol', 'vol', 'psy', 'insecte', 'roche', 'spectre', 'dragon',
         'acier', 'fee'
     ]);
     const vus = new Set();

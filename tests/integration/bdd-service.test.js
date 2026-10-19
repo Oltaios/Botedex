@@ -267,3 +267,100 @@ test('dresseur inexistant : valeurs par défaut sûres', async () => {
     assert.equal(await bddService.getStartWorkTimeUser('gx', 'ux'), null);
     assert.equal(await bddService.getGameLastPlayedAt('gx', 'ux', 'type'), null);
 });
+
+test('getClassementDresseurs : Pokédex distinct, captures totales, isolation et limite', async () => {
+    // Serveur gc1 : uc1 (2 distincts, 5 captures), uc2 (2 distincts, 2 captures),
+    // uc3 (aucune capture) ; uc9 capture uniquement sur le serveur voisin
+    await bddService.createNewUser('gc1', 'uc1', 'carapuce');
+    await bddService.createNewUser('gc1', 'uc2', 'bulbizarre');
+    await bddService.createNewUser('gc1', 'uc3', 'magicarpe');
+    await bddService.createNewUser('gc2', 'uc9', 'mew');
+
+    // uc1 : Pikachu (25) + Evoli (133) + trois doublons revendus
+    await bddService.registerNewCapture('gc1', 'uc1', 25);
+    await bddService.registerNewCapture('gc1', 'uc1', 133);
+    await bddService.incrementCaptureCount('gc1', 'uc1');
+    await bddService.incrementCaptureCount('gc1', 'uc1');
+    await bddService.incrementCaptureCount('gc1', 'uc1');
+    // uc2 : Bulbizarre (1) + Salamèche (4)
+    await bddService.registerNewCapture('gc1', 'uc2', 1);
+    await bddService.registerNewCapture('gc1', 'uc2', 4);
+    // uc9 : capture uniquement sur l'autre serveur
+    await bddService.registerNewCapture('gc2', 'uc9', 151);
+
+    // Critère 'pokedex' (défaut) : 2-2-0, égalité uc1/uc2 départagée par nom
+    const parPokedex = await bddService.getClassementDresseurs('gc1');
+    assert.equal(parPokedex.length, 3);
+    assert.deepEqual(parPokedex.map((d) => d.userId), ['uc2', 'uc1', 'uc3']);
+    assert.deepEqual(parPokedex.map((d) => d.score), [2, 2, 0]);
+    assert.ok(parPokedex.every((d) => typeof d.name === 'string'), 'nom projeté');
+    assert.ok(!parPokedex.some((d) => d.userId === 'uc9'), 'isolation par serveur');
+
+    // Critère 'captures' : doublons inclus, uc1 passe devant
+    const parCaptures = await bddService.getClassementDresseurs('gc1', 'captures');
+    assert.deepEqual(parCaptures.map((d) => d.userId), ['uc1', 'uc2', 'uc3']);
+    assert.deepEqual(parCaptures.map((d) => d.score), [5, 2, 0]);
+
+    // Limite respectée, base vide sans erreur
+    assert.equal((await bddService.getClassementDresseurs('gc1', 'pokedex', 2)).length, 2);
+    assert.deepEqual(await bddService.getClassementDresseurs('gc-inexistante'), []);
+
+    // Critère 'egg' : uc2 fait éclore un œuf et prend la tête
+    await bddService.giveEgg('gc1', 'uc2');
+    for (let i = 0; i < 10; i++) {
+        await bddService.progressEgg('gc1', 'uc2');
+    }
+    assert.equal(await bddService.hatchEgg('gc1', 'uc2', 42, 10), 0);
+    const parEgg = await bddService.getClassementDresseurs('gc1', 'egg');
+    assert.deepEqual(parEgg.map((d) => d.userId), ['uc2', 'uc1', 'uc3']);
+    assert.deepEqual(parEgg.map((d) => d.score), [1, 0, 0]);
+
+    // Document antérieur à la feature (sans champ oeufsEclos) : score 0
+    await bddService.createOperation('dresseurs', { _id: { guildId: 'gc4', userId: 'uL' }, name: 'ancien' });
+    const legacy = await bddService.getClassementDresseurs('gc4', 'egg');
+    assert.equal(legacy.length, 1);
+    assert.equal(legacy[0].score, 0, 'compteur absent = 0 œuf éclos');
+});
+
+test('œuf : obtention unique, progression atomique, éclosion au seuil', async () => {
+    await bddService.createNewUser('ge1', 'ue1', 'je1');
+
+    // Pas d'œuf : la progression ne fait rien
+    assert.equal(await bddService.progressEgg('ge1', 'ue1'), null);
+
+    // Dresseur inexistant : obtention refusée sans effet
+    assert.equal(await bddService.giveEgg('ge1', 'inconnu'), 1);
+
+    // Obtention : la condition "pas d'œuf en cours" est dans le filtre,
+    // un second appel ne peut pas écraser l'œuf en incubation
+    assert.equal(await bddService.giveEgg('ge1', 'ue1'), 0);
+    assert.equal(await bddService.giveEgg('ge1', 'ue1'), 1);
+
+    // Progression : 9 captures, l'éclosion est refusée avant le seuil
+    for (let i = 1; i <= 9; i++) {
+        const etat = await bddService.progressEgg('ge1', 'ue1');
+        assert.equal(etat.eggActive, 1);
+        assert.equal(etat.eggCaptures, i, 'valeur retournée après incrément');
+    }
+    assert.equal(await bddService.hatchEgg('ge1', 'ue1', 42, 10), 1, 'éclosion refusée sous le seuil');
+    assert.equal((await bddService.getEggState('ge1', 'ue1')).eggCaptures, 9);
+
+    // 10e capture : éclosion, Pokémon marqué, œuf réinitialisé
+    await bddService.progressEgg('ge1', 'ue1');
+    assert.equal(await bddService.hatchEgg('ge1', 'ue1', 42, 10), 0);
+    const etatFinal = await bddService.getEggState('ge1', 'ue1');
+    assert.equal(etatFinal.eggActive, 0);
+    assert.equal(etatFinal.eggCaptures, 0);
+    const doc = await bddService.getDresseur('ge1', 'ue1');
+    assert.equal(doc[42], 1, 'Pokémon de l\'œuf ajouté au Pokédex');
+    assert.equal(doc.nbrCapture, 0, 'l\'éclosion ne compte pas comme une capture');
+    assert.equal(doc.oeufsEclos, 1, 'compteur d\'œufs éclos incrémenté (la tentative refusée sous le seuil ne compte pas)');
+
+    // Après éclosion, un nouvel œuf peut être confié, et le compteur cumule
+    assert.equal(await bddService.giveEgg('ge1', 'ue1'), 0);
+    for (let i = 0; i < 10; i++) {
+        await bddService.progressEgg('ge1', 'ue1');
+    }
+    assert.equal(await bddService.hatchEgg('ge1', 'ue1', 43, 10), 0);
+    assert.equal((await bddService.getDresseur('ge1', 'ue1')).oeufsEclos, 2, 'compteur cumulatif sur plusieurs éclosions');
+});

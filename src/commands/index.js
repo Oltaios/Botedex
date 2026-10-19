@@ -15,11 +15,13 @@ import * as work from './work.js';
 import * as money from './money.js';
 import * as balls from './balls.js';
 import * as pokedex from './pokedex.js';
+import * as classement from './classement.js';
+import * as egg from './egg.js';
 import * as casino from './casino.js';
 import * as help from './help.js';
 import * as admin from './admin.js';
 
-export { ping, capture, shop, game, work, money, balls, pokedex, casino, help, admin };
+export { ping, capture, shop, game, work, money, balls, pokedex, classement, egg, casino, help, admin };
 
 /**
  * Liste toutes les commandes disponibles
@@ -35,6 +37,8 @@ export function getAllCommands() {
         money.metadata,
         balls.metadata,
         pokedex.metadata,
+        classement.metadata,
+        egg.metadata,
         casino.metadata,
         help.metadata,
         admin.metadata

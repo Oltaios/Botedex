@@ -56,6 +56,8 @@ Quelques précisions de labo :
 | `!balls` | Consulter ton inventaire de balls | |
 | `!game` | Mini-jeu « devine le type » | 100 $ si tu gagnes |
 | `!pokedex` | Nombre de POKEMONS capturés | Pour flex en grande légende |
+| `!classement` | Classement des dresseurs du serveur | Voir section ci-dessous |
+| `!egg` | Œuf : obtention et état d'éclosion | Voir section ci-dessous |
 | `!shop` | Acheter des balls | Voir section ci-dessous |
 | `!help` | Liste des commandes | Pour les tête en l'air |
 | `!ping` | Vérifier que le bot est réveillé | Il répond Pong. C'est tout. |
@@ -103,6 +105,28 @@ Par exemple : `!superball5` pour cinq superballs.
 
 Consulte le nombre de POKEMONS capturés pour flex en grande légende. (Une capture d'un
 POKEMON déjà possédé compte aussi dans ton palmarès de chasseur, tu comprendras.)
+
+### `!classement`
+
+Le palmarès du serveur, trois façons de briller :
+
+- `!classement` ou `!classement pokedex` : nombre de POKEMON **différents** capturés ;
+- `!classement captures` : nombre de captures **effectuées**, doublons inclus ;
+- `!classement egg` : nombre d'**œufs éclos**. Le vrai trophée de patience.
+
+Le top 10 s'affiche, podium en tête.
+
+### `!egg`
+
+Le Professeur Chen confie des œufs aux dresseurs ambitieux :
+
+- `!egg obtenir` : récupère un œuf (un seul en incubation à la fois) ;
+- `!egg` : demande des nouvelles. L'état reste flou — « On est encore loin
+  de l'éclosion ! », « L'œuf éclôt bientôt ! » — à toi d'estimer.
+
+Chaque **capture réussie** fait progresser l'œuf. Après **10 captures**, il
+éclot et un POKEMON **aléatoire** rejoint ton Pokédex, annoncé pendant la
+capture qui a tout déclenché. Ensuite ? Un nouvel œuf t'attend au labo.
 
 ---
 
