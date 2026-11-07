@@ -95,6 +95,9 @@
   "egg": {
     "capturesRequises": 10
   },
+  "egg": {
+    "capturesRequises": 10
+  },
   "casino": {
     "minBet": 1,
     "maxBet": 500,

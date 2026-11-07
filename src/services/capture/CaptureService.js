@@ -53,6 +53,13 @@ export class CaptureService {
             "**Clic !**\nDoublon de {nomPoke} ! La Team Rocket rachète le second à {reward}$, affaire classée.",
             "**Clic !**\nEncore un {nomPoke}... La Team Rocket envoie un conteneur frigorifique et te file {reward}$ pour ta discrétion."
         ]);
+        // Messages d'éclosion d'œuf : chaque variante garde le mot-clé "éclos"
+        // attendu par les tests d'intégration
+        this.messagesEclosion = new PhrasesAleatoires([
+            "🥚 **Crac !** Ton œuf a éclos : un {nomPoke} en sort et rejoint ton Pokédex !",
+            "🥚 **Crac !** Pendant que tu capturais, ton œuf a éclos : bonjour {nomPoke} !",
+            "🥚 **Crac !** Ton œuf a éclos, et c'est un {nomPoke} qui pointe le bout de son nez !"
+        ]);
     }
 
     /**
