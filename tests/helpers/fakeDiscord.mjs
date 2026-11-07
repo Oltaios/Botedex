@@ -84,8 +84,14 @@ export function fakeMessage({
         channel: channel ?? fakeChannel({ id: 'chan-test' }),
         content,
         replies: [],
+        reactions: [],
         reply: async (replyContent) => {
             message.replies.push(replyContent);
+            return message; // comme discord.js, reply renvoie le message envoyé
+        },
+        react: async (emoji) => {
+            message.reactions.push(emoji);
+            return { emoji: { name: emoji } };
         }
     };
     return message;

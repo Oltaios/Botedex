@@ -9,9 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import '../helpers/env.mjs';
-import { parsingPkm, parsingPkmNomType1Type2 } from '../../src/utils/parsing.js';
+import { parsingPkm, parsingPkmNomType1Type2, parsingIdsPkmParRarete } from '../../src/utils/parsing.js';
 
-const NB_POKEMON = 151;
+// Source de vérité : game.numberOfPokemon (cohérence vérifiée dans config.test.js)
+const NB_POKEMON = JSON.parse(readFileSync('config/gameConfig.json', 'utf8')).game.numberOfPokemon;
 const NB_CHAMPS = 42;
 
 /** Lignes du CSV sans la ligne vide finale */
@@ -37,9 +38,9 @@ test('parsingPkm(null) retourne null (pas de spawn actif)', () => {
     assert.equal(parsingPkm(null), null);
 });
 
-test('structure du CSV : 151 lignes, 42 champs, nameFR en dernière colonne', () => {
+test('structure du CSV : 42 champs, nameFR en dernière colonne, une ligne par Pokémon de la config', () => {
     const lines = lignes();
-    assert.equal(lines.length, NB_POKEMON + 1, 'header + 151 Pokémon');
+    assert.equal(lines.length, NB_POKEMON + 1, 'header + ' + NB_POKEMON + ' Pokémon');
 
     const header = champs(lines[0]);
     assert.equal(header.length, NB_CHAMPS);
@@ -79,7 +80,7 @@ test('types du CSV : 18 types français, aucun reste anglais', () => {
     const attendus = new Set([
         'normal', 'feu', 'eau', 'electrik', 'plante', 'glace', 'combat', 'poison',
         'sol', 'vol', 'psy', 'insecte', 'roche', 'spectre', 'dragon',
-        'acier', 'fee'
+        'acier', 'fee', 'tenebres'
     ]);
     const vus = new Set();
     const lines = lignes();
@@ -91,5 +92,13 @@ test('types du CSV : 18 types français, aucun reste anglais', () => {
     for (const type of vus) {
         assert.ok(attendus.has(type), `type inattendu dans le CSV : "${type}" (reste anglais ?)`);
     }
-    assert.equal(vus.size, attendus.size, 'les 18 types doivent apparaître dans la génération 1');
+    assert.equal(vus.size, attendus.size, 'les 18 types doivent apparaître dans le CSV (gen 1 + gen 2)');
+});
+
+test('parsingIdsPkmParRarete : répartit les numéros selon is_legendary', () => {
+    const { communs, legendaires } = parsingIdsPkmParRarete(151);
+    assert.deepEqual(legendaires, [144, 145, 146, 150, 151], 'légendaires (is_legendary = 1) parmi les 151 premiers');
+    assert.equal(communs.length, 151 - legendaires.length, 'communs = tous les autres');
+    assert.ok(communs.includes(1) && communs.includes(25), 'exemples de communs');
+    assert.ok(!communs.includes(144) && !communs.includes(151), 'aucun légendaire dans les communs');
 });

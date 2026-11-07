@@ -17,6 +17,7 @@ import { bddService } from '../bdd/BDDService.js';
 import { moneyService } from './MoneyService.js';
 import { getConfig, getDiscordGuildId } from '../../utils/configLoader.js';
 import { channelService } from '../channel/ChannelService.js';
+import { dailyEventService } from '../event/DailyEventService.js';
 
 // Durée d'une session de travail (1 heure)
 const WORK_DURATION_MS = 60 * 60 * 1000;
@@ -62,6 +63,9 @@ export class WorkService {
             this.finishWork(guildId, userId).catch(console.error);
             channelService.replySafe(message, "Travail terminé ! (à lire avec une voix de peon si t'es assez vieux)")
         }, WORK_DURATION_MS));
+
+        // Event quotidien : partir travailler rapporte des points d'activité
+        await dailyEventService.registerActivity(guildId, userId, 'work');
 
         return true;
     }

@@ -14,3 +14,7 @@
 process.env.DISCORD_TOKEN ??= 'token-de-test';
 process.env.GIPHY_API_KEY ??= 'cle-giphy-de-test';
 process.env.DATABASE_NAME ??= 'botedex-test';
+
+// Event quotidien désactivé par défaut dans les tests (évite les récompenses
+// d'event dans les tests existants) ; les tests dédiés le réactivent ('on')
+process.env.BOTEDEX_DAILY_EVENT ??= 'off';

@@ -26,7 +26,7 @@ export async function execute(message) {
 // Metadata pour l'aide automatique
 export const metadata = {
     name: 'game',
-    description: 'Lance un mini-jeu : !game type (deviner le type) ou !game weight (deviner le poids d\'un Pokémon)',
-    usage: '!game [type|weight]',
+    description: 'Lance un mini-jeu : !game type (deviner le type), !game poids (deviner le poids), !game nom (pendu sur le nom), !game talent (deviner le talent, réponse par réaction emoji)',
+    usage: '!game [type|poids|nom|talent]',
     category: 'Jeux'
 };

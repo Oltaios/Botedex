@@ -19,8 +19,33 @@ import { channelService } from '../channel/ChannelService.js';
 import { getConfig } from '../../utils/configLoader.js';
 import { sendGif } from '../../utils/gif.js';
 import { Pokemon } from '../../models/Pokemon.js';
-import { parsingPkmNomType1Type2, parsingPkmNomPoids } from '../../utils/parsing.js';
+import { parsingPkm, parsingPkmAbilities, parsingToutesAbilities, parsingPkmNomType1Type2, parsingPkmNomPoids } from '../../utils/parsing.js';
 import { pendingResponses } from '../../core/client.js';
+import { dailyEventService } from '../event/DailyEventService.js';
+
+/** Normalise un mot : minuscules, accents retirés (NFD) — pour comparer les lettres */
+function normaliserMot(mot) {
+    return String(mot).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/** Normalise une lettre saisie (1 caractère, sans accent) */
+function normaliserLettre(l) {
+    const n = normaliserMot(l);
+    return /^[a-z]$/.test(n) ? n : '';
+}
+
+/**
+ * Affichage du pendu : lettres trouvées en clair [E], lettres cachées [*],
+ * espaces en _ et autres caractères (point, symboles) visibles tels quels
+ */
+function afficherMot(nom, lettresTrouvees) {
+    return [...String(nom)].map((car) => {
+        if (car === ' ') return '_';
+        const n = normaliserMot(car);
+        if (!/^[a-z]$/.test(n)) return car;
+        return lettresTrouvees.has(n) ? car.toUpperCase() : ' * ';
+    }).join(' ');
+}
 
 export class GameService {
     constructor() {
@@ -28,16 +53,30 @@ export class GameService {
         // Jeux disponibles : clé = type saisi par le dresseur (ex: "!type"),
         // description affichée lors du choix, launch = lanceur du jeu
         // (reçoit le type de jeu, clé du jeton horaire en base)
+        // Emojis de réponse du quiz "ability" (1 à 4)
+        this.EMOJIS_REPONSES = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+        // Sessions de quiz "ability" actives, indexées par id du message du bot
+        this.sessionsAbilites = new Map();
         this.games = {
             type: {
                 description: 'Devine le ou les types d\'un Pokémon',
                 launch: (message, gameType) => this.guessMyType(message, gameType)
             },
-            weight: {
+            poids: {
                 description: 'Devine le poids d\'un Pokémon',
                 launch: (message, gameType) => this.guessMyWeight(message, gameType)
+            },
+            nom: {
+                description: 'Devine le nom français d\'un Pokémon (pendu)',
+                launch: (message, gameType) => this.guessMyName(message, gameType)
+            },
+            talent: {
+                description: 'Devine la capacité (talent) d\'un Pokémon parmi 4 (réaction 1️⃣-4️⃣)',
+                launch: (message, gameType) => this.guessMyAbility(message, gameType)
             }
         };
+        // Alias rétrocompatibles : anciennes commandes anglaises -> nouvelles clés FR
+        this.aliasJeux = { weight: 'poids', name: 'nom', ability: 'talent' };
     }
 
     /**
@@ -82,6 +121,7 @@ export class GameService {
             return;
         }
 
+        gameType = this.resoudreJeu(gameType);
         const game = this.games[gameType];
         if (!game) {
             await channelService.replySafe(message, `🎮 Je ne connais pas ce mini-jeu. Jeux disponibles :\n${this.listerJeux()}`);
@@ -106,6 +146,9 @@ export class GameService {
             return;
         }
 
+        // Event quotidien : jouer rapporte des points d'activité
+        await dailyEventService.registerActivity(guildId, dresseurId, 'game');
+
         await this.games[gameType].launch(message, gameType);
     }
 
@@ -114,6 +157,15 @@ export class GameService {
      * @param {Object} [jeux=this.games] - Jeux à lister (tous par défaut)
      * @returns {string}
      */
+    /**
+     * Résout un type de jeu saisi vers sa clé actuelle (alias EN -> FR)
+     * @param {string} gameType - Type saisi (ex: 'weight' ou 'poids')
+     * @returns {string} - Clé actuelle du jeu (ex: 'poids')
+     */
+    resoudreJeu(gameType) {
+        return this.aliasJeux?.[gameType] ?? gameType;
+    }
+
     listerJeux(jeux = this.games) {
         return Object.entries(jeux)
             .map(([type, game]) => `**!${type}** - ${game.description}`)
@@ -158,7 +210,7 @@ export class GameService {
         const collector = message.channel.createMessageCollector({ filter, time: this.config.game.chooseGameTimeMs });
 
         collector.on('collect', async collected => {
-            const gameType = collected.content.slice(1).toLowerCase();
+            const gameType = this.resoudreJeu(collected.content.slice(1).toLowerCase());
             const game = this.games[gameType];
             if (!game) {
                 await channelService.replySafe(collected, `🎮 Je ne connais pas ce mini-jeu. Jeux disponibles :\n${this.listerJeux(jeuxDisponibles)}`);
@@ -173,7 +225,9 @@ export class GameService {
             }
             collector.stop();
             console.log(`User ${dresseurId} (${message.author.username}) a choisi le mini-jeu ${gameType}`);
-            await game.launch(message, gameType);
+            // Passe par lancerJeu (et non game.launch directement) pour que le
+            // choix différé enregistre aussi les points d'activité de l'event quotidien
+            await this.lancerJeu(message, gameType);
         });
 
         collector.on('end', (collected, reason) => {
@@ -202,7 +256,7 @@ export class GameService {
         const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
         const { nomPokeENG, type_1, type_2, nomPokeFR } = parsingPkmNomType1Type2(numPkm);
         const pkm2Guess = new Pokemon(numPkm, nomPokeENG, type_1, type_2 || null);
-        await sendGif(pkm2Guess.nom + " @pokemon", message);
+        await sendGif(pkm2Guess.nom, message);
         const reward = this.getReward('guessMyType');
         const type1 = pkm2Guess.getType1();
         const type2 = pkm2Guess.getType2();
@@ -284,7 +338,7 @@ export class GameService {
 
         const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
         const { nomPokeENG, poids, nomPokeFR } = parsingPkmNomPoids(numPkm);
-        await sendGif(nomPokeENG + " @pokemon", message);
+        await sendGif(nomPokeENG, message);
         const reward = this.getReward('guessMyWeight');
         const expectedWeight = parseFloat(poids);
         const marge = expectedWeight * gameConfig.guessMyWeightTolerance;
@@ -347,6 +401,223 @@ export class GameService {
     }
 
     /**
+     * Mini-jeu "guessMyName" (pendu) : le dresseur devine le NOM FRANÇAIS d'un
+     * Pokémon aléatoire. Une voyelle est offerte au départ (toutes ses
+     * occurrences sont révélées), puis chaque proposition "!<lettre>" révèle
+     * toutes les occurrences de la lettre ; les lettres cachées sont affichées
+     * [*]. Erreurs max : guessMyNameMaxErrors (2) — à la 3e erreur le jeu
+     * s'arrête sans gain. Nom complet trouvé -> guessMyNameReward (50 $).
+     * Le jeton horaire est consommé dès la première réponse.
+     * @param {Object} message - Message Discord ayant déclenché le jeu
+     * @param {string} gameType - Type de jeu (clé du jeton horaire en base)
+     * @returns {Promise<void>}
+     */
+    async guessMyName(message, gameType) {
+        const dresseurId = message.author.id;
+        const guildId = message.guildId;
+        const gameConfig = this.config.game;
+
+        const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
+        const nomPokeFR = parsingPkm(numPkm)[2];
+        const reward = this.getReward('guessMyName');
+        const maxErrors = gameConfig.guessMyNameMaxErrors ?? 2;
+
+        // Lettres du mot (minuscules, sans accents) ; une voyelle offerte au départ
+        const lettresMot = [...normaliserMot(nomPokeFR)].filter((c) => /[a-z]/.test(c));
+        const voyelles = [...new Set(lettresMot.filter((c) => 'aeiouy'.includes(c)))];
+        const lettresTrouvees = new Set();
+        if (voyelles.length > 0) {
+            lettresTrouvees.add(voyelles[Math.floor(Math.random() * voyelles.length)]);
+        }
+        const proposees = new Set(lettresTrouvees); // la voyelle offerte est déjà connue
+        let erreurs = 0;
+
+        console.log(`User ${dresseurId} (${message.author.username}) launched guessMyName and picked ${nomPokeFR} [${numPkm}]`);
+
+        await channelService.replySafe(message,
+            `🎮 **Pendu !** Devine le nom français du Pokémon : ${afficherMot(nomPokeFR, lettresTrouvees)}\n` +
+            `Une voyelle est offerte. Propose une lettre avec **!e** (exemple). ${maxErrors} erreurs max avant la défaite. À gagner : **${reward}$** !`
+        );
+
+        const responseKey = `${message.channel.id}:${dresseurId}`;
+        // Marque le joueur comme "en attente de réponse" pour ignorer ses messages dans messageCreate
+        pendingResponses.add(responseKey);
+
+        const filter = (m) => m.author.id === dresseurId && /^![a-zàâäéèêëîïôöùûüç]$/i.test(m.content);
+        const collector = message.channel.createMessageCollector({ filter, time: gameConfig.guessMyNameTimeMs ?? 30000 });
+
+        const motTrouve = () => lettresMot.every((c) => lettresTrouvees.has(c));
+
+        collector.on('collect', async (collected) => {
+            // Le jeton est consommé dès la première réponse, gagnant ou perdant
+            if (collector.collected.size === 1) {
+                await bddService.recordGamePlayed(guildId, dresseurId, gameType, new Date());
+            }
+            const lettre = normaliserLettre(collected.content.slice(1));
+            if (!lettre) {
+                await channelService.replySafe(collected, "❌ Une seule lettre à la fois, ex: **!e**");
+                collector.resetTimer();
+                return;
+            }
+            if (proposees.has(lettre)) {
+                await channelService.replySafe(collected, `La lettre ${lettre.toUpperCase()} a déjà été proposée : ${afficherMot(nomPokeFR, lettresTrouvees)}`);
+                collector.resetTimer();
+                return;
+            }
+            proposees.add(lettre);
+
+            if (lettresMot.includes(lettre)) {
+                lettresTrouvees.add(lettre);
+                if (motTrouve()) {
+                    await channelService.replySafe(collected, `🎉 Bravo ! C'était bien **${nomPokeFR}** ! Tu gagnes ${reward} pokédollars !`);
+                    await moneyService.gainMoney(guildId, dresseurId, reward);
+                    await sendGif(parsingPkm(numPkm)[0], message); // sticker de révélation
+                    collector.stop();
+                    return;
+                }
+                await channelService.replySafe(collected, `✅ Bonne lettre : ${afficherMot(nomPokeFR, lettresTrouvees)} (encore ${maxErrors + 1 - erreurs} erreur(s) autorisée(s))`);
+            } else {
+                erreurs++;
+                if (erreurs > maxErrors) {
+                    await channelService.replySafe(collected, `💀 3e erreur, c'est perdu ! Le Pokémon était **${nomPokeFR}** — aucun gain.`);
+                    await sendGif(parsingPkm(numPkm)[0], message); // sticker de révélation
+                    collector.stop();
+                    return;
+                }
+                await channelService.replySafe(collected, `❌ ${lettre.toUpperCase()} n'est pas dans le nom : ${afficherMot(nomPokeFR, lettresTrouvees)} — ${maxErrors + 1 - erreurs} erreur(s) restante(s) avant la défaite.`);
+            }
+            collector.resetTimer();
+        });
+
+        collector.on('end', (collected, reason) => {
+            if (reason === 'time') {
+                channelService.replySafe(message, `⏰ Temps écoulé ! Le Pokémon était **${nomPokeFR}**.`);
+            }
+            pendingResponses.delete(responseKey); // Libère la clé
+        });
+    }
+
+    /**
+     * Mini-jeu "guessMyAbility" : 4 capacités sont tirées au sort (dont une est
+     * celle du Pokémon affiché) ; le dresseur répond en cliquant sur la réaction
+     * 1️⃣-4️⃣ posée par le bot sur le message du quiz. Bonne réponse ->
+     * guessMyAbilityReward. Jeton horaire consommé au premier clic.
+     * @param {Object} message - Message Discord ayant déclenché le jeu
+     * @param {string} gameType - Type de jeu (clé du jeton horaire en base)
+     * @returns {Promise<void>}
+     */
+    async guessMyAbility(message, gameType) {
+        const dresseurId = message.author.id;
+        const guildId = message.guildId;
+        const gameConfig = this.config.game;
+
+        const numPkm = Math.floor(Math.random() * gameConfig.numberOfPokemon) + 1;
+        const [nomPokeENG, , nomPokeFR] = parsingPkm(numPkm);
+        const capacitesPkm = parsingPkmAbilities(numPkm);
+        const reward = this.getReward('guessMyAbility');
+
+        if (capacitesPkm.length === 0) {
+            await channelService.replySafe(message, "❌ Ce Pokémon n'a pas de capacité connue, partie annulée.");
+            return;
+        }
+
+        // La bonne réponse : une capacité du Pokémon ; 3 distracteurs distincts tirés dans le pool global
+        const bonne = capacitesPkm[Math.floor(Math.random() * capacitesPkm.length)];
+        const pool = parsingToutesAbilities().filter((a) => a !== bonne);
+        const distracteurs = [];
+        while (distracteurs.length < 3 && pool.length > 0) {
+            distracteurs.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        }
+        // Mélange des 4 options
+        const options = [bonne, ...distracteurs];
+        for (let i = options.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [options[i], options[j]] = [options[j], options[i]];
+        }
+        const bonneIndex = options.indexOf(bonne);
+
+        console.log(`User ${dresseurId} (${message.author.username}) launched guessMyAbility and picked ${nomPokeFR} [${numPkm}] (bonne réponse: ${bonne})`);
+
+        // Sticker du Pokémon (comme les autres jeux), puis le quiz avec ses réactions
+        await sendGif(nomPokeENG + ' @pokemon', message);
+
+        const listeOptions = options.map((c, i) => `${this.EMOJIS_REPONSES[i]} ${c}`).join('\n'); // talents déjà en français dans le CSV
+        const texte =
+            `🎮 **Quelle est la capacité de ${nomPokeFR} ?**\n${listeOptions}\n` +
+            `Réponds en cliquant sur la réaction correspondante. Gain : **${reward}$** !`;
+        const msgJeu = await channelService.replySafe(message, texte);
+        if (!msgJeu || typeof msgJeu.react !== 'function') return;
+        for (const emoji of this.EMOJIS_REPONSES) {
+            await msgJeu.react(emoji).catch((e) => console.warn('[GAME] react impossible :', e.message));
+        }
+
+        // Session : indexée par l'id du message du quiz, jusqu'à la réponse ou au timeout
+        const responseKey = `${message.channel.id}:${dresseurId}`;
+        pendingResponses.add(responseKey);
+        const session = {
+            guildId,
+            userId: dresseurId,
+            channelId: message.channel.id,
+            numPkm,
+            nomPokeFR,
+            options,
+            bonneIndex,
+            repondu: false
+        };
+        session.timer = setTimeout(() => {
+            this.terminerSessionAbility(msgJeu.id, `⏰ Temps écoulé ! La capacité de **${nomPokeFR}** était **${options[bonneIndex]}**.`);
+        }, gameConfig.guessMyAbilityTimeMs ?? 30000);
+        this.sessionsAbilites.set(msgJeu.id, session);
+    }
+
+    /**
+     * Traite une réaction emoji sur un message de quiz "ability"
+     * @param {Object} reaction - Réaction discord.js (reaction.emoji.name, reaction.message.id)
+     * @param {Object} user - Auteur de la réaction
+     * @returns {Promise<void>}
+     */
+    async handleReaction(reaction, user) {
+        const session = this.sessionsAbilites.get(reaction.message?.id);
+        if (!session) return; // pas un quiz actif
+        if (user.id !== session.userId) return; // seul le joueur de la partie répond
+        const index = this.EMOJIS_REPONSES.indexOf(reaction.emoji?.name);
+        if (index === -1 || session.repondu) return; // emoji hors quiz ou déjà répondu
+
+        session.repondu = true;
+        clearTimeout(session.timer);
+        // Le jeton horaire est consommé au premier clic
+        await bddService.recordGamePlayed(session.guildId, session.userId, 'talent', new Date());
+
+        const bonne = session.options[session.bonneIndex]; // en français (CSV traduit)
+        const ok = index === session.bonneIndex;
+        const reward = this.getReward('guessMyAbility');
+        if (ok) {
+            await moneyService.gainMoney(session.guildId, session.userId, reward);
+            await channelService.sendMessage(`🎉 Bravo <@${session.userId}> ! La capacité de **${session.nomPokeFR}** est bien **${bonne}** : +${reward}$ !`);
+        } else {
+            await channelService.sendMessage(`❌ Raté <@${session.userId}> ! La capacité de **${session.nomPokeFR}** était **${bonne}**. Aucun gain.`);
+        }
+
+        this.sessionsAbilites.delete(reaction.message.id);
+        pendingResponses.delete(`${session.channelId}:${session.userId}`);
+    }
+
+    /**
+     * Termine une session de quiz "ability" (timeout) : révèle la réponse et nettoie
+     * @param {string} msgId - Id du message du quiz
+     * @param {string} texte - Message de fin à envoyer
+     * @returns {Promise<void>}
+     */
+    async terminerSessionAbility(msgId, texte) {
+        const session = this.sessionsAbilites.get(msgId);
+        if (!session || session.repondu) return;
+        session.repondu = true;
+        this.sessionsAbilites.delete(msgId);
+        pendingResponses.delete(`${session.channelId}:${session.userId}`);
+        await channelService.sendMessage(texte);
+    }
+
+    /**
      * Retourne la récompense pour un jeu spécifique
      * @param {string} gameName - Nom du jeu (ex: 'guessMyType')
      * @returns {number}
@@ -360,6 +631,8 @@ export class GameService {
                 return rewards.guessMyWeightReward;
             case 'guessMyName':
                 return rewards.guessMyNameReward;
+            case 'guessMyAbility':
+                return rewards.guessMyAbilityReward ?? 50;
             default:
                 return 0;
         }

@@ -124,9 +124,10 @@ Le Professeur Chen confie des œufs aux dresseurs ambitieux :
 - `!egg` : demande des nouvelles. L'état reste flou — « On est encore loin
   de l'éclosion ! », « L'œuf éclôt bientôt ! » — à toi d'estimer.
 
-Chaque **capture réussie** fait progresser l'œuf. Après **10 captures**, il
+Chaque **capture tentée** fait progresser l'œuf. Après **10 captures**, il
 éclot et un POKEMON **aléatoire** rejoint ton Pokédex, annoncé pendant la
-capture qui a tout déclenché. Ensuite ? Un nouvel œuf t'attend au labo.
+capture qui a tout déclenché. Le Pokémon qui naît a de fortes chances d'être
+un Pokémon encore non capturé par le dresseur
 
 ---
 

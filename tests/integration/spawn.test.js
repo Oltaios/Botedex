@@ -33,8 +33,9 @@ before(async () => {
 test('spawn : annonce le nom FR, cherche le GIF avec le nom EN + @pokemon', async (t) => {
     const gif = stubGiphy();
     t.after(() => gif.restore());
-    // random = 0 : Pokémon n°1 (Bulbasaur), phrases communes, déterministe
-    t.mock.method(Math, 'random', () => 0);
+    // 1er random = 0.5 (>= 1% : pool commun), 2e = 0 : index 0 du pool -> Pokémon n°1 (Bulbasaur)
+    const seqCommun = [0.5, 0];
+    t.mock.method(Math, 'random', () => (seqCommun.length ? seqCommun.shift() : 0.99));
 
     // Etat pollué par d'éventuels tests précédents : on repart de zéro
     clearTentativesCapture();
@@ -57,9 +58,31 @@ test('spawn : annonce le nom FR, cherche le GIF avec le nom EN + @pokemon', asyn
     assert.equal(gif.calls.length, 1, 'une seule requête Giphy');
     const url = new URL(gif.calls[0]);
     assert.equal(url.hostname, 'api.giphy.com');
-    assert.equal(decodeURIComponent(url.searchParams.get('q')), 'Bulbasaur @pokemon');
+    assert.equal(decodeURIComponent(url.searchParams.get('q')), '"Bulbasaur" @pokemon', 'recherche exacte entre guillemets (filtrage channel via username)');
 
     // Le GIF puis l'appel à !capture partent dans le channel principal
     assert.ok(channel.sent.includes('https://media.giphy.com/fake/test.gif'));
     assert.ok(channel.sent.some((m) => String(m).includes('!capture')));
+});
+
+test('spawn : un tirage sous spawn.pokemonRarity.legendary (1%) fait apparaître un légendaire', async (t) => {
+    const gif = stubGiphy();
+    t.after(() => gif.restore());
+    // 1er random = 0 (< 0.01 : pool légendaire), 2e = 0 : index 0 -> n°144 (Articuno/Artikodin, is_legendary=1)
+    const seqLeg = [0, 0];
+    t.mock.method(Math, 'random', () => (seqLeg.length ? seqLeg.shift() : 0.99));
+
+    clearTentativesCapture();
+
+    await spawnService.spawnPokemon();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(getNumPkmAvailable(), 144, 'Artikodin (n°144, is_legendary=1) est le spawn actif');
+
+    assert.ok(
+        channel.sent.some((m) => String(m).includes('Artikodin') && String(m).includes('[144]')),
+        `annonce avec le nom FR du légendaire : ${JSON.stringify(channel.sent)}`    );
+
+    const url = new URL(gif.calls[0]);
+    assert.equal(decodeURIComponent(url.searchParams.get('q')), '"Articuno" @pokemon', 'recherche exacte entre guillemets');
 });

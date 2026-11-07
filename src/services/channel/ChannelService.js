@@ -112,7 +112,7 @@ export class ChannelService {
      * @param {number} [delayMs=0] - Délai optionnel avant l'envoi, en millisecondes ;
      *        0 (défaut) = envoi immédiat, rétrocompatible avec tous les
      *        appels existants à deux arguments
-     * @returns {Promise<void>}
+     * @returns {Promise<Object>} - Le message envoyé (utile pour y poser des réactions)
      */
     async replySafe(message, content, delayMs = 0) {
         if (delayMs > 0) {
@@ -121,10 +121,10 @@ export class ChannelService {
             await new Promise(resolve => setTimeout(resolve, delayMs));
         }
         try {
-            await message.reply(content);
+            return await message.reply(content);
         } catch (error) {
             console.warn('[ChannelService] Reply impossible (message supprimé ?), envoi direct dans le channel :', error.message);
-            await message.channel.send(content).catch(() => {});
+            return await message.channel.send(content).catch(() => {});
         }
     }
 

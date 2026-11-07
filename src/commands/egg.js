@@ -30,8 +30,8 @@ export async function execute(message) {
         await channelService.replySafe(
             message,
             confie
-                ? "🥚 Le Professeur Chen te confie un œuf ! Continue de capturer, il finira bien par éclorer..."
-                : "Tu as déjà un œuf en incubation ! File capturer, il n'éclosira pas tout seul."
+                ? "🥚 Le Professeur Chen te confie un œuf ! Continue de capturer, il finira bien par éclore..."
+                : "Tu as déjà un œuf en incubation ! File capturer, il ne va pas voir le jour tout seul."
         );
         return;
     }

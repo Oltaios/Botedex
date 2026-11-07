@@ -34,7 +34,8 @@ test('gameConfig : structure requise', () => {
         gameConfig.spawn.minIntervalMinutes <= gameConfig.spawn.maxIntervalMinutes,
         'spawn.minIntervalMinutes <= maxIntervalMinutes'
     );
-    assert.ok(typeof gameConfig.release.notes === 'string', 'release.notes requis');
+    assert.ok(typeof gameConfig.release.notes === 'string', 'release.notes requis (fallback inline)');
+    assert.ok(typeof gameConfig.release.notesFile === 'string' && gameConfig.release.notesFile.length > 0, 'release.notesFile requis (patch note markdown)');
 });
 
 test('cohérence : numberOfPokemon === nombre de lignes de données du CSV', () => {

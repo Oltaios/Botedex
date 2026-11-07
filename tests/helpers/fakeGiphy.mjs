@@ -26,7 +26,7 @@ export function stubGiphy({ gifUrl = 'https://media.giphy.com/fake/test.gif', ok
             ok,
             json: async () => ({
                 // /stickers/search renvoie un tableau de résultats
-                data: ok ? [{ images: { original: { url: gifUrl } } }] : []
+                data: ok ? [{ username: 'pokemon', images: { original: { url: gifUrl } } }] : []
             })
         };
     };

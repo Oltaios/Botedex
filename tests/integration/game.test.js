@@ -24,6 +24,9 @@ const { gameService } = await import('../../src/services/game/GameService.js');
 const { fakeChannel, fakeCollector, fakeMessage } = await import('../helpers/fakeDiscord.mjs');
 
 const CHANNEL_ID = 'chan-game';
+const { getConfig } = await import('../../src/utils/configLoader.js');
+const REWARD_ABILITY = getConfig().game.guessMyAbilityReward; // lu depuis la config (pas en dur)
+const REWARD_NAME = getConfig().game.guessMyNameReward;
 const GUILD = 'guild-game';
 
 /**
@@ -126,13 +129,13 @@ test('!game <type inconnu> : liste les jeux sans consommer le jeton', async () =
     assert.equal(await gameService.isGameAvailable(GUILD, 'ug3', 'type'), true, 'jeton intact');
 });
 
-test('!game weight : victoire dans la marge de tolérance (±10 %), récompense créditée', async () => {
+test('!game poids : victoire dans la marge de tolérance (±10 %), récompense créditée', async () => {
     await bddService.createNewUser(GUILD, 'uw1', 'joueurw1');
     const { channel, collectors } = channelAvecCollectors();
     const restaurer = fixerRandom(0); // Bulbizarre, 6.9 kg (marge acceptée : 6.21 à 7.59)
 
     try {
-        const message = await lancerCommande('uw1', '!game weight', channel);
+        const message = await lancerCommande('uw1', '!game poids', channel);
         assert.ok(message.replies.some((r) => String(r).includes('poids')), 'consigne du mini-jeu affichée');
         assert.ok(message.replies.some((r) => String(r).includes('essais')), 'nombre d\'essais affiché');
         assert.ok(message.replies.some((r) => String(r).includes('±10 %')), 'marge de tolérance annoncée');
@@ -142,7 +145,7 @@ test('!game weight : victoire dans la marge de tolérance (±10 %), récompense 
 
         assert.ok(reponse.replies.some((r) => String(r).includes('You found it')), 'victoire dans la marge');
         assert.ok(reponse.replies.some((r) => String(r).includes('Le poids exact était 6.9 kg')), 'poids exact révélé');
-        assert.equal(await gameService.isGameAvailable(GUILD, 'uw1', 'weight'), false, 'jeton consommé dès la première réponse');
+        assert.equal(await gameService.isGameAvailable(GUILD, 'uw1', 'poids'), false, 'jeton consommé dès la première réponse');
         assert.equal(await bddService.getMoneyForUser(GUILD, 'uw1'), 580, 'récompense de 80 pokédollars créditée');
         assert.ok(!pendingResponses.has(`${CHANNEL_ID}:uw1`), 'clé libérée à la fin du jeu');
     } finally {
@@ -150,13 +153,13 @@ test('!game weight : victoire dans la marge de tolérance (±10 %), récompense 
     }
 });
 
-test('!game weight : indices plus lourd / plus léger puis échec au dernier essai', async () => {
+test('!game poids : indices plus lourd / plus léger puis échec au dernier essai', async () => {
     await bddService.createNewUser(GUILD, 'uw2', 'joueurw2');
     const { channel, collectors } = channelAvecCollectors();
     const restaurer = fixerRandom(0); // Bulbizarre, 6.9 kg (marge acceptée : 6.21 à 7.59)
 
     try {
-        await lancerCommande('uw2', '!game weight', channel);
+        await lancerCommande('uw2', '!game poids', channel);
 
         // 6.0 kg : hors marge, juste en dessous
         const tropPetit = fakeMessage({ authorId: 'uw2', guildId: GUILD, channel, content: '!6' });
@@ -170,7 +173,7 @@ test('!game weight : indices plus lourd / plus léger puis échec au dernier ess
         const dernier = fakeMessage({ authorId: 'uw2', guildId: GUILD, channel, content: '!blabla' });
         await collectors[0].emit('collect', dernier);
         assert.ok(dernier.replies.some((r) => String(r).includes('The answer was !6.9 kg')), 'révélation du poids à l\'échec');
-        assert.equal(await gameService.isGameAvailable(GUILD, 'uw2', 'weight'), false, 'jeton consommé dès la première réponse');
+        assert.equal(await gameService.isGameAvailable(GUILD, 'uw2', 'poids'), false, 'jeton consommé dès la première réponse');
         assert.ok(!pendingResponses.has(`${CHANNEL_ID}:uw2`), 'clé libérée à la fin du jeu');
     } finally {
         restaurer();
@@ -229,16 +232,16 @@ test('jetons indépendants par jeu : jouer à type ne bloque pas weight', async 
     await bddService.recordGamePlayed(GUILD, 'uj1', 'type', new Date());
 
     assert.equal(await gameService.isGameAvailable(GUILD, 'uj1', 'type'), false, 'type déjà joué cette heure');
-    assert.equal(await gameService.isGameAvailable(GUILD, 'uj1', 'weight'), true, 'weight toujours disponible');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'uj1', 'poids'), true, 'poids toujours disponible');
 });
 
 test('jeton horaire : un jeu joué à l\'heure précédente redevient disponible', async () => {
     await bddService.createNewUser(GUILD, 'uj2', 'jeton2');
     const heurePrecedente = new Date();
     heurePrecedente.setHours(heurePrecedente.getHours() - 1);
-    await bddService.recordGamePlayed(GUILD, 'uj2', 'weight', heurePrecedente);
+    await bddService.recordGamePlayed(GUILD, 'uj2', 'poids', heurePrecedente);
 
-    assert.equal(await gameService.isGameAvailable(GUILD, 'uj2', 'weight'), true, 'heure précédente => disponible');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'uj2', 'poids'), true, 'heure précédente => disponible');
 });
 
 test('!game seul : seuls les jeux pas encore joués cette heure sont proposés', async () => {
@@ -249,17 +252,159 @@ test('!game seul : seuls les jeux pas encore joués cette heure sont proposés',
     const message = await lancerCommande('uj3', '!game', channel);
 
     const question = String(message.replies.find((r) => String(r).includes('Quel mini-jeu')));
-    assert.ok(question.includes('**!weight**'), 'weight proposé');
+    assert.ok(question.includes('**!poids**'), 'poids proposé');
     assert.ok(!question.includes('**!type**'), 'type déjà joué, non proposé');
 });
 
 test('!game seul : aucun jeu disponible cette heure', async () => {
     await bddService.createNewUser(GUILD, 'uj4', 'jeton4');
     await bddService.recordGamePlayed(GUILD, 'uj4', 'type', new Date());
-    await bddService.recordGamePlayed(GUILD, 'uj4', 'weight', new Date());
+    await bddService.recordGamePlayed(GUILD, 'uj4', 'poids', new Date());
+    await bddService.recordGamePlayed(GUILD, 'uj4', 'nom', new Date());
+    await bddService.recordGamePlayed(GUILD, 'uj4', 'talent', new Date());
     const { channel } = channelAvecCollectors();
 
     const message = await lancerCommande('uj4', '!game', channel);
 
     assert.ok(message.replies.some((r) => String(r).includes('non disponible')), 'refus global');
+});
+
+test('!game nom : lance le pendu, voyelle offerte révélée, lettres masquées', async () => {
+    await bddService.createNewUser(GUILD, 'un1', 'pendu1');
+    const { channel, collectors } = channelAvecCollectors();
+    const restaurer = fixerRandom(0); // numPkm = 1 (Bulbizarre), voyelle offerte = 1ère présente (u)
+    let message;
+    try {
+        message = await lancerCommande('un1', '!game nom', channel);
+    } finally {
+        restaurer();
+    }
+    assert.equal(collectors.length, 1, 'collector de lettres créé');
+    const consigne = message.replies.find((r) => String(r).includes('Pendu'));
+    assert.ok(consigne, 'consigne pendu affichée');
+    assert.ok(/\*/.test(String(consigne)) && /\bU\b/.test(String(consigne)), 'voyelle offerte révélée (U), le reste masqué (*) : ' + consigne);
+    assert.ok(String(consigne).includes(REWARD_NAME + '$'), 'récompense affichée (config guessMyNameReward)');
+});
+
+test('!game nom : trouver le nom complet rapporte 50$ (guessMyNameReward)', async () => {
+    await bddService.createNewUser(GUILD, 'un2', 'pendu2');
+    const { channel, collectors } = channelAvecCollectors();
+    const restaurer = fixerRandom(0); // Bulbizarre
+    let message;
+    try {
+        message = await lancerCommande('un2', '!game nom', channel);
+    } finally {
+        restaurer();
+    }
+    // lettres de 'bulbizarre' : b,u,l,i,z,a,r,e — 'u' déjà offerte au départ
+    const reponses = [];
+    for (const l of ['b', 'l', 'i', 'z', 'a', 'r', 'e']) {
+        const rep = fakeMessage({ authorId: 'un2', guildId: GUILD, channel, content: '!' + l });
+        await collectors[0].emit('collect', rep);
+        reponses.push(rep);
+    }
+    const win = reponses.at(-1).replies.find((r) => String(r).includes('Bravo'));
+    assert.ok(win, 'message de victoire : ' + JSON.stringify(reponses.at(-1).replies));
+    assert.ok(String(win).includes('Bulbizarre'), 'nom révélé dans le message de victoire');
+    assert.equal((await bddService.getDresseur(GUILD, 'un2')).argent, 550, '50$ crédités (500 + guessMyNameReward)');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'un2', 'nom'), false, 'jeton consommé dès la 1re réponse');
+});
+
+test('!game nom : 3e erreur = défaite sans gain, réponse révélée', async () => {
+    await bddService.createNewUser(GUILD, 'un3', 'pendu3');
+    const { channel, collectors } = channelAvecCollectors();
+    const restaurer = fixerRandom(0); // Bulbizarre
+    try {
+        await lancerCommande('un3', '!game nom', channel);
+    } finally {
+        restaurer();
+    }
+    const reponses = [];
+    for (const l of ['x', 'y', 'w']) { // 3 lettres absentes de 'bulbizarre'
+        const rep = fakeMessage({ authorId: 'un3', guildId: GUILD, channel, content: '!' + l });
+        await collectors[0].emit('collect', rep);
+        reponses.push(rep);
+    }
+    const lose = reponses[2].replies.find((r) => String(r).includes('perdu'));
+    assert.ok(lose, 'message de défaite à la 3e erreur');
+    assert.ok(String(lose).includes('Bulbizarre'), 'réponse révélée après défaite');
+    assert.equal((await bddService.getDresseur(GUILD, 'un3')).argent, 500, 'aucun gain à la défaite');
+});
+
+test('!game talent : 4 options + 4 réactions posées, bonne réponse rapporte la récompense config', async () => {
+    await bddService.createNewUser(GUILD, 'ua1', 'quiz1');
+    const { channel } = channelAvecCollectors();
+    const restaurer = fixerRandom(0); // numPkm = 1 (Bulbizarre), bonne capacité = Overgrow (1ère)
+    let message;
+    try {
+        message = await lancerCommande('ua1', '!game talent', channel);
+    } finally {
+        restaurer();
+    }
+    const session = gameService.sessionsAbilites.get(message.id);
+    assert.ok(session, 'session de quiz créée (indexée par le message)');
+    assert.equal(session.options.length, 4, '4 capacités proposées');
+    assert.ok(session.options.includes('Engrais'), 'la capacité du Pokémon (Bulbizarre) est dans les options, en français (CSV traduit)');
+    const quiz = message.replies.find((r) => String(r).includes('capacité de'));
+    assert.ok(quiz && String(quiz).includes('Engrais'), 'options affichées en français (Engrais)');
+    assert.equal(message.reactions.length, 4, '4 réactions emoji posées par le bot');
+    assert.deepEqual(message.reactions, ['1️⃣', '2️⃣', '3️⃣', '4️⃣']);
+
+    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+    const bonEmoji = emojis[session.bonneIndex];
+    await gameService.handleReaction({ emoji: { name: bonEmoji }, message: { id: message.id } }, { id: 'ua1', bot: false });
+
+    assert.equal((await bddService.getDresseur(GUILD, 'ua1')).argent, 500 + REWARD_ABILITY, 'récompense créditée (guessMyAbilityReward, config)');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'ua1', 'talent'), false, 'jeton consommé au 1er clic');
+    assert.equal(gameService.sessionsAbilites.get(message.id), undefined, 'session nettoyée après réponse');
+    assert.ok(!pendingResponses.has(`${CHANNEL_ID}:ua1`), 'clé de réponse libérée');
+    const mainChannel = client.channels.cache.get(CHANNEL_ID);
+    const win = mainChannel.sent.find((m) => String(m).includes('Bravo'));
+    assert.ok(win && String(win).includes('Engrais'), 'victoire annoncée avec la bonne capacité (en français)');
+});
+
+test('!game talent : mauvaise réponse = aucun gain, bonne capacité révélée', async () => {
+    await bddService.createNewUser(GUILD, 'ua2', 'quiz2');
+    const { channel } = channelAvecCollectors();
+    const restaurer = fixerRandom(0); // Bulbizarre / Overgrow
+    let message;
+    try {
+        message = await lancerCommande('ua2', '!game talent', channel);
+    } finally {
+        restaurer();
+    }
+    const session = gameService.sessionsAbilites.get(message.id);
+    const mauvaisIndex = (session.bonneIndex + 1) % 4;
+    await gameService.handleReaction({ emoji: { name: ['1️⃣','2️⃣','3️⃣','4️⃣'][mauvaisIndex] }, message: { id: message.id } }, { id: 'ua2', bot: false });
+    assert.equal((await bddService.getDresseur(GUILD, 'ua2')).argent, 500, 'aucun gain');
+    const mainChannel = client.channels.cache.get(CHANNEL_ID);
+    const lose = mainChannel.sent.find((m) => String(m).includes('Raté'));
+    assert.ok(lose && String(lose).includes('Engrais'), 'bonne capacité révélée en français après échec');
+});
+
+test('!game talent : la réaction d\'un autre joueur est ignorée', async () => {
+    await bddService.createNewUser(GUILD, 'ua3', 'quiz3');
+    await bddService.createNewUser(GUILD, 'ua4', 'intrus');
+    const { channel } = channelAvecCollectors();
+    const restaurer = fixerRandom(0);
+    let message;
+    try {
+        message = await lancerCommande('ua3', '!game talent', channel);
+    } finally {
+        restaurer();
+    }
+    const session = gameService.sessionsAbilites.get(message.id);
+    await gameService.handleReaction({ emoji: { name: '1️⃣' }, message: { id: message.id } }, { id: 'ua4', bot: false });
+    assert.equal(session.repondu, false, 'pas de réponse enregistrée pour un autre joueur');
+    assert.equal((await bddService.getDresseur(GUILD, 'ua4')).argent, 500, 'aucun gain pour l\'intrus');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'ua3', 'talent'), true, 'jeton du joueur non consommé');
+});
+
+test('e2e alias : !game weight (ancien nom) lance le jeu poids sous la clé française', async () => {
+    await bddService.createNewUser(GUILD, 'ua9', 'alias');
+    const { channel } = channelAvecCollectors();
+    const message = await lancerCommande('ua9', '!game weight', channel);
+    assert.ok(message.replies.some((r) => String(r).includes('poids')), 'jeu de poids lancé via l\'alias anglais');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'ua9', 'poids'), true, 'jeton sous la nouvelle clé FR');
+    assert.equal(await gameService.isGameAvailable(GUILD, 'ua9', 'weight'), true, 'pas de jeton sous l\'ancienne clé');
 });

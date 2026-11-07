@@ -17,8 +17,11 @@
  *     workStartTime, argentGagne, ballsAchetees, capturesEchouees, argentMise,
  *     eggActive, eggCaptures, oeufsEclos (œuf : en cours, captures effectuées
  *     depuis l'obtention, éclosions cumulées),
+ *     isActive, lastCommandAt, activityPoints (event quotidien : activité
+ *     sur les dernières 24h et points du jour),
  *     un champ par type de ball de la config,
- *     '<numéroPokémon>' (1-151): 0|1, ... }
+ *     dexBits (bitset base64url du Pokédex, 1 bit par Pokémon, extensible),
+ *     dexCount (nombre de Pokémon distincts capturés) }
  *
  * Utilisation :
  *   import { bddService } from './services/bdd/BDDService.js';
@@ -28,6 +31,7 @@
 
 import { MongoClient } from 'mongodb';
 import { getConfig, getDatabaseConfig } from '../../utils/configLoader.js';
+import { decodeDexBits, encodeDexBits, setBitDex, aCaptureDex, popcountDex, bitsDepuisLegacy, nbOctetsDex } from '../../utils/dexBits.js';
 
 export class BDDService {
     static #instance = null; // Instance unique (Singleton)
@@ -35,6 +39,7 @@ export class BDDService {
     #initialized = false;
     #dbConfig = null;
     #dresseursCollection = 'dresseurs'; // Nom résolu depuis database.json
+    #dailyEventCollection = 'dailyEvent'; // Nom résolu depuis database.json
 
     constructor() {
         if (BDDService.#instance) {
@@ -43,6 +48,7 @@ export class BDDService {
         BDDService.#instance = this;
         this.#dbConfig = getDatabaseConfig();
         this.#dresseursCollection = this.#dbConfig.collections?.dresseurs || 'dresseurs';
+        this.#dailyEventCollection = this.#dbConfig.collections?.dailyEvent || 'dailyEvent';
     }
 
     /**
@@ -166,8 +172,46 @@ export class BDDService {
      * @returns {Promise<boolean>}
      */
     async alreadyCaptured(guildId, userId, numPkm) {
+        const bits = await this.getDexBitsForUser(guildId, userId);
+        return bits !== null && aCaptureDex(bits, numPkm);
+    }
+
+    /**
+     * Retourne le bitset du Pokédex d'un dresseur (Buffer), décodé depuis
+     * dexBits, ou reconstruit depuis les anciens champs numériques (legacy)
+     * @returns {Promise<Buffer|null>} - null si le dresseur n'existe pas
+     */
+    async getDexBitsForUser(guildId, userId) {
         const row = await this.getDresseur(guildId, userId);
-        return row && row[numPkm] === 1;
+        if (!row) return null;
+        return row.dexBits !== undefined && row.dexBits !== null
+            ? decodeDexBits(row.dexBits)
+            : bitsDepuisLegacy(row);
+    }
+
+    /**
+     * Pose le bit d'un Pokémon dans le Pokédex (champ dexBits), avec verrou
+     * optimiste sur l'ancienne valeur et retry. Incrémente dexCount si le
+     * Pokémon n'était pas encore capturé.
+     * @returns {Promise<number>} - 0 si le bit vient d'être posé, 1 s'il était déjà là
+     */
+    async setPokedexBit(guildId, userId, numPkm) {
+        for (let essai = 0; essai < 3; essai++) {
+            const row = await this.getDresseur(guildId, userId);
+            if (!row) return 1;
+            const ancien = row.dexBits ?? null;
+            let bits = ancien !== null ? decodeDexBits(ancien) : bitsDepuisLegacy(row);
+            const deja = aCaptureDex(bits, numPkm);
+            bits = setBitDex(bits, numPkm); // agrandit le buffer si besoin (extensible)
+            const filtre = { _id: this.#dresseurId(guildId, userId) };
+            if (ancien !== null) filtre.dexBits = ancien; // verrou optimiste
+            const res = await this.db.collection(this.#dresseursCollection).updateOne(
+                filtre,
+                { $set: { dexBits: encodeDexBits(bits) }, ...(deja ? {} : { $inc: { dexCount: 1 } }) }
+            );
+            if (res.matchedCount === 1) return deja ? 1 : 0;
+        }
+        return 1; // après retries : on considère le bit déjà posé (côté sûr)
     }
 
     /**
@@ -179,9 +223,10 @@ export class BDDService {
      * @returns {Promise<void>}
      */
     async registerNewCapture(guildId, userId, numPkm) {
+        await this.setPokedexBit(guildId, userId, numPkm);
         await this.db.collection(this.#dresseursCollection).updateOne(
             { _id: this.#dresseurId(guildId, userId) },
-            { $set: { [numPkm]: 1 }, $inc: { nbrCapture: 1 } }
+            { $inc: { nbrCapture: 1 } }
         );
     }
 
@@ -330,7 +375,7 @@ export class BDDService {
 
     /**
      * Crée un nouveau dresseur avec les valeurs par défaut
-     * Pré-remplit tous les Pokémon (1 à 151) comme non capturés
+     * Pré-remplit tous les Pokémon (1 à game.numberOfPokemon) comme non capturés
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} idUser - ID Discord de l'utilisateur (partie userId de la clé _id)
      * @param {string} username - Nom d'affichage Discord de l'utilisateur
@@ -354,16 +399,20 @@ export class BDDService {
             // et éclosions cumulées (statistique de classement)
             eggActive: 0,
             eggCaptures: 0,
-            oeufsEclos: 0
+            oeufsEclos: 0,
+            // Event quotidien : activité sur les dernières 24h, points du jour
+            isActive: 0,
+            lastCommandAt: null,
+            activityPoints: 0
         };
         // Ajoute un champ de stock par type de ball de la config (0 par défaut)
         for (const ballType of Object.keys(getConfig().balls)) {
             row[ballType] = 0;
         }
-        // Ajoute les champs pour les Pokémon 1-151 (génération 1 du CSV)
-        for (let i = 1; i <= 151; i++) {
-            row[i] = 0;
-        }
+        // Pokédex compact : bitset base64url (1 bit par Pokémon) + compteur de distincts
+        const nbPkm = getConfig().game.numberOfPokemon;
+        row.dexBits = encodeDexBits(Buffer.alloc(nbOctetsDex(nbPkm)));
+        row.dexCount = 0;
         await this.createOperation(this.#dresseursCollection, row);
     }
 
@@ -388,7 +437,7 @@ export class BDDService {
     /**
      * Retourne l'heure de début de session de travail d'un dresseur
      * Projection sur le seul champ workStartTime : évite de charger
-     * tout le document (151 champs Pokédex) pour une simple lecture
+     * tout le document (champs Pokédex (1..numberOfPokemon)) pour une simple lecture
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number|null>} - Timestamp de début en ms, ou null
@@ -407,7 +456,7 @@ export class BDDService {
     /**
      * Retourne tous les dresseurs actuellement au travail (isWorking = 1)
      * Projection sur les seuls champs utiles : évite de charger tout le
-     * document (151 champs Pokédex) pour chaque dresseur
+     * document (champs Pokédex (1..numberOfPokemon)) pour chaque dresseur
      * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
      *        les guilds (mono-serveur, sans isolation)
      * @returns {Promise<Array<Object>>} - Dresseurs au travail :
@@ -447,7 +496,7 @@ export class BDDService {
 
     /**
      * Retourne le nombre de Pokémon capturés par un dresseur
-     * (compte les champs Pokémon 1 à 151 valant 1)
+     * (compteur dexCount, ou popcount du bitset dexBits en repli legacy)
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @returns {Promise<number>} - 0 si le dresseur n'existe pas
@@ -455,11 +504,9 @@ export class BDDService {
     async getPokedexStateForUser(guildId, userId) {
         const row = await this.getDresseur(guildId, userId);
         if (!row) return 0;
-        let count = 0;
-        for (let i = 1; i <= 151; i++) {
-            if (row[i] === 1) count++;
-        }
-        return count;
+        if (row.dexCount !== undefined && row.dexCount !== null) return row.dexCount;
+        const bits = await this.getDexBitsForUser(guildId, userId);
+        return bits ? popcountDex(bits) : 0;
     }
 
     /**
@@ -468,7 +515,7 @@ export class BDDService {
      * disponibilité se calcule par comparaison avec l'heure courante
      * (GameService.isGameAvailable), sans reset planifié
      * Projection sur le seul champ utile : évite de charger tout le
-     * document (151 champs Pokédex)
+     * document (champs Pokédex (1..numberOfPokemon))
      * @param {string} guildId - ID du serveur Discord (isolation des données)
      * @param {string} userId - ID Discord du dresseur
      * @param {string} gameType - Type de jeu (clé dans gameTokens, ex: 'type')
@@ -560,7 +607,7 @@ export class BDDService {
     /**
      * Retourne les meilleurs dresseurs d'un serveur, classés par argent
      * accumulé, avec leurs compteurs de statistiques (projection réduite,
-     * sans les 151 champs Pokédex)
+     * sans les champs Pokédex (1..numberOfPokemon))
      * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
      *        les guilds (mono-serveur, sans isolation)
      * @param {number} [limit=5] - Nombre maximal de dresseurs retournés
@@ -591,10 +638,9 @@ export class BDDService {
      * 'pokedex' (nombre de Pokémon distincts capturés), 'captures' (nombre
      * de captures effectuées, doublons inclus, via le compteur nbrCapture)
      * ou 'egg' (nombre d'œufs éclos, via le compteur oeufsEclos).
-     * Le critère 'pokedex' est calculé côté serveur en comptant les champs
-     * '<numéro>' (1-151) à 1 : les autres champs numériques du document
-     * (argent, compteurs) ont des clés non numériques, la regex suffit
-     * donc à isoler le Pokédex sans charger les 151 champs côté bot
+     * Le critère 'pokedex' lit le compteur dexCount (nombre de Pokémon
+     * distincts, maintenu à chaque capture dans le bitset dexBits) ;
+     * repli à 0 pour les documents créés avant la migration
      * @param {string|null} guildId - ID du serveur Discord, ou null pour toutes
      *        les guilds (mono-serveur, sans isolation)
      * @param {string} [critere='pokedex'] - Critère de tri : 'pokedex', 'captures' ou 'egg'
@@ -609,20 +655,7 @@ export class BDDService {
             : critere === 'egg'
                 // Compteur absent des documents créés avant la feature : 0
                 ? { $ifNull: ['$oeufsEclos', 0] }
-                : {
-                    $size: {
-                        $filter: {
-                            input: { $objectToArray: '$$ROOT' },
-                            as: 'champ',
-                            cond: {
-                                $and: [
-                                    { $eq: ['$$champ.v', 1] },
-                                    { $regexMatch: { input: '$$champ.k', regex: '^[0-9]+$' } }
-                                ]
-                            }
-                        }
-                    }
-                };
+                : { $ifNull: ['$dexCount', 0] }; // compteur de distincts (bitset dexBits)
         return await this.db.collection(this.#dresseursCollection).aggregate([
             { $match: filter },
             { $addFields: { score } },
@@ -708,9 +741,107 @@ export class BDDService {
                 eggActive: 1,
                 eggCaptures: { $gte: capturesRequises }
             },
-            { $set: { eggActive: 0, eggCaptures: 0, [numPkm]: 1 }, $inc: { oeufsEclos: 1 } }
+            { $set: { eggActive: 0, eggCaptures: 0 }, $inc: { oeufsEclos: 1 } }
         );
-        return result.matchedCount === 0 ? 1 : 0;
+        if (result.matchedCount === 0) return 1;
+        await this.setPokedexBit(guildId, userId, numPkm);
+        return 0;
+    }
+
+    // ========== EVENT QUOTIDIEN (activité des dresseurs) ==========
+
+    /**
+     * Migration : ajoute activityPoints/isActive/lastCommandAt aux dresseurs
+     * existants qui n'ont pas encore ces champs
+     */
+    async ensureActivityFields() {
+        await this.db.collection(this.#dresseursCollection).updateMany(
+            { activityPoints: { $exists: false } },
+            { $set: { activityPoints: 0, isActive: 0, lastCommandAt: null } }
+        );
+    }
+
+    /**
+     * Marque un dresseur actif : enregistre la date de dernière commande
+     * et passe isActive à 1
+     */
+    async markUserActive(guildId, userId) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { $set: { lastCommandAt: new Date(), isActive: 1 } }
+        );
+    }
+
+    /**
+     * Ajoute des points d'activité au dresseur et le marque actif
+     * ($inc + $set dans la même opération atomique)
+     */
+    async addActivityPoints(guildId, userId, points) {
+        await this.db.collection(this.#dresseursCollection).updateOne(
+            { _id: this.#dresseurId(guildId, userId) },
+            { $inc: { activityPoints: points }, $set: { lastCommandAt: new Date(), isActive: 1 } }
+        );
+    }
+
+    /** Compte les dresseurs actifs (isActive = 1) d'un serveur */
+    async countActivePlayers(guildId) {
+        return await this.db.collection(this.#dresseursCollection)
+            .countDocuments({ '_id.guildId': guildId, isActive: 1 });
+    }
+
+    /** Liste les dresseurs actifs d'un serveur avec leurs points du jour */
+    async getActivePlayers(guildId) {
+        const rows = await this.db.collection(this.#dresseursCollection)
+            .find({ '_id.guildId': guildId, isActive: 1 }, { projection: { name: 1, activityPoints: 1 } })
+            .toArray();
+        return rows.map((r) => ({ userId: r._id.userId, name: r.name, activityPoints: r.activityPoints ?? 0 }));
+    }
+
+    /** Remet à zéro les points d'activité de TOUS les dresseurs (reset 2h) */
+    async resetAllActivityPoints() {
+        await this.db.collection(this.#dresseursCollection).updateMany({}, { $set: { activityPoints: 0 } });
+    }
+
+    /**
+     * Recalcule isActive pour tous les dresseurs : actif si dernière commande
+     * dans la fenêtre de 24h (lastCommandAt >= limitDate)
+     */
+    async recomputeActiveFlags(limitDate) {
+        const col = this.db.collection(this.#dresseursCollection);
+        await col.updateMany({ lastCommandAt: { $gte: limitDate } }, { $set: { isActive: 1 } });
+        await col.updateMany(
+            { $or: [{ lastCommandAt: { $lt: limitDate } }, { lastCommandAt: null }, { lastCommandAt: { $exists: false } }] },
+            { $set: { isActive: 0 } }
+        );
+    }
+
+    // ========== EVENT QUOTIDIEN (document par serveur) ==========
+
+    /** Document d'event du serveur (null si jamais créé) */
+    async getDailyEvent(guildId) {
+        return await this.readOperation(this.#dailyEventCollection, guildId);
+    }
+
+    /** Incrémente le total de points de l'event (upsert) et épingle la dateKey */
+    async incDailyEventTotal(guildId, points, dateKey) {
+        await this.db.collection(this.#dailyEventCollection).updateOne(
+            { _id: guildId },
+            { $inc: { totalPoints: points }, $set: { dateKey }, $setOnInsert: { goal: 0, completed: false, rewardPaid: 0 } },
+            { upsert: true }
+        );
+    }
+
+    /** Met à jour des champs du document d'event (upsert) */
+    async setDailyEventFields(guildId, fields) {
+        await this.db.collection(this.#dailyEventCollection).updateOne({ _id: guildId }, { $set: fields }, { upsert: true });
+    }
+
+    /** Reset de tous les documents d'event (nouvelle dateKey, compteurs à 0) */
+    async resetAllDailyEvents(dateKey) {
+        await this.db.collection(this.#dailyEventCollection).updateMany(
+            {},
+            { $set: { dateKey, totalPoints: 0, goal: 0, completed: false, rewardPaid: 0 } }
+        );
     }
 }
 

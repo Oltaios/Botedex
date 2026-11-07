@@ -11,9 +11,10 @@ import { client, token } from './client.js';
 import { bddService } from '../services/bdd/BDDService.js';
 import { spawnService } from '../services/game/SpawnService.js';
 import { workService } from '../services/economy/WorkService.js';
+import { dailyEventService } from '../services/event/DailyEventService.js';
 import { channelService } from '../services/channel/ChannelService.js';
 import { registerAllEvents } from '../events/index.js';
-import { getConfig } from '../utils/configLoader.js';
+import { getConfig, getReleaseNotes, decouperMessages } from '../utils/configLoader.js';
 
 
 
@@ -41,9 +42,14 @@ async function initServices() {
 
     await channelService.init(process.env.DISCORD_CHANNEL_ID);
     let versionBotedex = getLogVersion();
-    let patchNote = getConfig().release.notes;
+    // Patch note lu depuis le fichier markdown release.notesFile (PATCHNOTE.md),
+    // découpé en messages de 2000 caractères max (limite Discord)
+    const morceauxPatchNote = decouperMessages(getReleaseNotes());
     try {
-        await channelService.sendMessage(`Démarrage du Botedex... Je suis up !\n${await versionBotedex}\n\n${patchNote}`);
+        for (let i = 0; i < morceauxPatchNote.length; i++) {
+            const prefixe = i === 0 ? `Démarrage du Botedex... Je suis up !\n${await versionBotedex}\n\n` : '';
+            await channelService.sendMessage(prefixe + morceauxPatchNote[i]);
+        }
     } catch (error) {
         console.error('❌ Impossible d\'envoyer le message de démarrage:', error);
     }
@@ -55,6 +61,9 @@ async function initServices() {
 
     // Libère les dresseurs bloqués au travail lors d'un redémarrage
     await workService.resetAllWork();
+
+    // Démarre l'événement quotidien collaboratif (reset à 2h00 locale)
+    await dailyEventService.start();
 
     console.log('✅ Tous les services initialisés avec succès');
 }

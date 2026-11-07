@@ -98,7 +98,7 @@ test('!pokedex renvoie le compte et le lien de checklist LivingDex', async () =>
     await handle(message);
     const reply = String(message.replies[0] ?? '');
     assert.ok(reply.includes('capturés : 0'), 'compte de captures');
-    assert.ok(reply.includes('https://livingdex.app/?game=rby#s='), 'lien LivingDex autoporteur');
+    assert.ok(reply.includes('https://livingdex.app/?game=gsc#s='), 'lien LivingDex autoporteur');
 });
 
 test('isolation : enregistré sur un serveur ne l\'est pas sur un autre', async () => {
