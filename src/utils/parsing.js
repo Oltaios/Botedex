@@ -102,6 +102,73 @@ export function parsingPkmNomPoids(id){
     let poids = array[id][weight_kg]
     return {nomPokeENG, poids, nomPokeFR};
 }
+/**
+ * Retourne les numéros de Pokémon (index de ligne dans le CSV) répartis par rareté
+ * selon la colonne is_legendary : 1 = légendaire, 0 = commun
+ * @param {number} maxId - Borne haute des numéros pris en compte (game.numberOfPokemon)
+ * @returns {Object} - { communs: number[], legendaires: number[] }
+ */
+export function parsingIdsPkmParRarete(maxId) {
+    var data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
+    var array = CSVToArray(data, ',');
+    const communs = [];
+    const legendaires = [];
+    for (let i = 1; i <= maxId && i < array.length; i++) {
+        if (array[i][is_legendary] === '1') {
+            legendaires.push(i);
+        } else {
+            communs.push(i);
+        }
+    }
+    return { communs, legendaires };
+}
+
+/**
+ * Extrait la liste des capacités d'une ligne CSV (colonne abilities, ex.
+ * "['Overgrow', 'Chlorophyll']") en tableau de noms
+ * @param {Array} row - Ligne parsée du CSV
+ * @returns {Array<string>}
+ */
+function abilitiesDeLigne(row) {
+    const raw = row?.[abilities];
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(String(raw).replace(/'/g, '"'));
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [...String(raw).matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    }
+}
+
+/**
+ * Retourne les capacités d'un Pokémon
+ * @param {number} id - Numéro du Pokémon (1 = 1ere ligne de données du CSV)
+ * @returns {Array<string>} - Noms des capacités (vide si id absent)
+ */
+export function parsingPkmAbilities(id) {
+    if (id == null) return [];
+    const data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
+    const array = CSVToArray(data, ',');
+    return abilitiesDeLigne(array[id]);
+}
+
+let toutesAbilitiesCache = null;
+
+/**
+ * Retourne le pool distinct de toutes les capacités du CSV (mémoïsé)
+ * @returns {Array<string>}
+ */
+export function parsingToutesAbilities() {
+    if (toutesAbilitiesCache) return toutesAbilitiesCache;
+    const data = fs.readFileSync('./data/pokemonLight.csv', 'utf8');
+    const array = CSVToArray(data, ',');
+    const set = new Set();
+    for (let i = 1; i < array.length; i++) {
+        for (const a of abilitiesDeLigne(array[i])) set.add(a);
+    }
+    toutesAbilitiesCache = [...set];
+    return toutesAbilitiesCache;
+}
 
 /**
  * Parse une chaine CSV en tableau 2D

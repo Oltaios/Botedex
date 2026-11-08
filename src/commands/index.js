@@ -20,8 +20,9 @@ import * as egg from './egg.js';
 import * as casino from './casino.js';
 import * as help from './help.js';
 import * as admin from './admin.js';
+import * as event from './event.js';
 
-export { ping, capture, shop, game, work, money, balls, pokedex, classement, egg, casino, help, admin };
+export { ping, capture, shop, game, work, money, balls, pokedex, classement, egg, casino, help, admin, event };
 
 /**
  * Liste toutes les commandes disponibles
@@ -41,6 +42,7 @@ export function getAllCommands() {
         egg.metadata,
         casino.metadata,
         help.metadata,
-        admin.metadata
+        admin.metadata,
+        event.metadata
     ];
 }

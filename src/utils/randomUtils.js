@@ -6,7 +6,7 @@
  *
  * Exemple d'utilisation :
  *   import { RandomUtils } from './utils/randomUtils.js';
- *   const numPkm = RandomUtils.nombreAleatoire(1, 151);
+ *   const n = RandomUtils.nombreAleatoire(1, 100); // entier entre 1 et 100
  */
 
 export class RandomUtils {

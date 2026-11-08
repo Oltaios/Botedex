@@ -22,10 +22,11 @@ import { Ball } from '../../models/Ball.js';
 import { setNumPkmAvailable, getNumPkmAvailable, setLockPkmAvailable, addTentativesCapture } from '../../core/client.js';
 import { inventoryService } from '../economy/InventoryService.js';
 import  { pendingResponses } from '../../core/client.js'
-import { parsingPkm } from '../../utils/parsing.js';
+import { parsingPkm, parsingPkmNomType1Type2 } from '../../utils/parsing.js';
 import { PhrasesAleatoires } from '../../utils/phrasesAleatoires.js';
 import { channelService } from '../channel/ChannelService.js';
 import { eggService } from '../egg/EggService.js';
+import { dailyEventService } from '../event/DailyEventService.js';
 
 
 export class CaptureService {
@@ -228,6 +229,8 @@ export class CaptureService {
 
         //L'utilisateur a pu utiliser une ball, son essai est consommé
         await addTentativesCapture(userId);
+        // Event quotidien : une tentative de capture rapporte des points d'activité
+        await dailyEventService.registerActivity(guildId, userId, 'capture');
         const reussiteCapture = await this.capture(userId, pokemonAvailable[1], ballType, pokemonAvailable[2], numPkm, message);
 
         //Le lancer a pu être effectué, succès ou échec à contrôler
@@ -256,20 +259,7 @@ export class CaptureService {
                 // Nouveau Pokémon !
                 await channelService.replySafe(message, this.messagesNouveau.piocher({ nomPoke: pokemonAvailable[2] }));
                 await bddService.registerNewCapture(guildId, userId, numPkm);
-            }
-
-            // Œuf : chaque capture réussie fait progresser l'éclosion ;
-            // si le seuil est atteint, un Pokémon aléatoire est offert
-            const numEclos = await eggService.onCapture(guildId, userId);
-            if (numEclos !== null) {
-                const pokemonEclos = parsingPkm(numEclos);
-                // Nom et numéro du Pokémon obtenus en gras (ex: **Roucool [16]**)
-                const nomEclos = `**${pokemonEclos[2]} [${numEclos}]**`;
-                await channelService.replySafe(
-                    message,
-                    this.messagesEclosion.piocher({ nomPoke: nomEclos })
-                );
-            }
+            }            
         }
         else{
             // Échec : Pokémon non capturé
@@ -278,13 +268,20 @@ export class CaptureService {
             await bddService.incrementerEchecCapture(guildId, userId);
             setLockPkmAvailable(0); //On libère le lock du pokémon
         }
+
+        // Œuf : chaque capture réussie fait progresser l'éclosion.
+            // EggService gère tout le résultat (message d'éclosion, ou doublon
+            // avec sa récompense) et l'envoie en reply à la commande
+            await eggService.onCapture(guildId, userId, message);
         return true;
     }
 
     /**
      * Lance une tentative de capture
-     * Le tirage : rng (0-99) * rate de la ball doit atteindre le seuil
-     * 100 - (taux de capture * rate de la ball) / 3
+     * Le tirage : rng (0-99) * rate effectif de la ball doit atteindre le seuil
+     * 100 - (taux de capture * rate effectif de la ball) / 3
+     * Le rate effectif vaut ball.rateEfficace si le Pokémon a au moins un type
+     * de ball.typesEfficaces (balls typées), sinon ball.rate
      * @param {string} userId - ID Discord du dresseur
      * @param {string|number} captureRate - Taux de capture de base du Pokémon (issu du CSV)
      * @param {string} ballType - Type de ball utilisé ('pokeball', 'superball', 'hyperball')
@@ -297,13 +294,18 @@ export class CaptureService {
         // Crée la ball utilisée
         const ball = new Ball(ballType);
 
-        // Calcule le taux de capture final (base * rate de la ball)
-        const finalCaptureRate = captureRate * ball.getRate();
+        // Rate effectif : les balls typées (typesEfficaces) passent à rateEfficace
+        // si le Pokémon a au moins un de leurs types, sinon rate de base
+        const { type_1, type_2 } = parsingPkmNomType1Type2(numPkm);
+        const rate = ball.getRateContre(type_1, type_2);
+
+        // Calcule le taux de capture final (base * rate effectif de la ball)
+        const finalCaptureRate = captureRate * rate;
         const threshold = 100 - (finalCaptureRate / 3);
         const rng = Math.floor(Math.random() * 100);
 
-        console.log(`[CAPTURE] User: ${userId}, Pokémon: ${pkmName}, Ball: ${ballType}, ` +
-                  `Rate: ${finalCaptureRate}, RNG: ${rng}, Threshold: ${threshold}`);
+        console.log(`[CAPTURE] User: ${userId}, Pokémon: ${pkmName} [${type_1}${type_2 ? '/' + type_2 : ''}], Ball: ${ballType}, ` +
+                  `Rate: ${rate} (final ${finalCaptureRate}), RNG: ${rng}, Threshold: ${threshold}`);
 
 
         // Commentaire de lancer selon la qualité du tirage (rng 0-99)
@@ -322,7 +324,7 @@ export class CaptureService {
                 break;
         }
 
-        if (rng * ball.getRate() >= threshold) {
+        if (rng * rate >= threshold) {
             return true; //Succès capture
         } else {
             return false; // Capture échouée

@@ -15,7 +15,7 @@
 import { getConfig } from '../../utils/configLoader.js';
 import { channelService } from '../channel/ChannelService.js';
 import { sendGif } from '../../utils/gif.js';
-import { parsingPkm } from '../../utils/parsing.js';
+import { parsingPkm, parsingIdsPkmParRarete } from '../../utils/parsing.js';
 import { clearTentativesCapture, setLockPkmAvailable, setNumPkmAvailable } from '../../core/client.js';
 import { PhrasesAleatoires } from '../../utils/phrasesAleatoires.js';
 
@@ -95,13 +95,14 @@ export class SpawnService {
 
     /**
      * Fait apparaître un Pokémon aléatoire dans le channel principal
-     * Tire un numéro entre 1 et game.numberOfPokemon, l'expose comme spawn
-     * actif et annonce le Pokémon (phrase piochée au hasard + GIF)
+     * Tire un numéro selon la rareté (spawn.pokemonRarity.legendary de chance
+     * de tomber sur un légendaire is_legendary=1), l'expose comme spawn actif
+     * et annonce le Pokémon (phrase piochée au hasard + GIF)
      * @returns {Promise<void>}
      */
     async spawnPokemon() {
 
-        const randomNumPkm = Math.floor(Math.random() * this.config.game.numberOfPokemon) + 1;
+        const randomNumPkm = this.tirerNumPkmAleatoire();
         const arrayParsingPkm = parsingPkm(randomNumPkm);
         const nomPokeENG = arrayParsingPkm[0];
         const captureRate = arrayParsingPkm[1];
@@ -113,10 +114,29 @@ export class SpawnService {
         channelService.sendMessage(this.annoncesSpawn.piocher({ nomPoke: nomPokeFR, numPkm: randomNumPkm }))
 
         //utilisation de @pokemon pour cibler des stickers generes par le compte officiel de Pokemon sur Giphy
-        await sendGif(nomPokeENG + " @pokemon");
+        await sendGif(nomPokeENG);
         // TODO: Intégrer avec la logique de capture
         // Exemple: Demander si un utilisateur veut capturer le Pokémon
         channelService.sendMessage(this.appelsCapture.piocher());
+    }
+
+    /**
+     * Tire un numéro de Pokémon selon la rareté configurée :
+     * spawn.pokemonRarity.legendary de probabilité de spawn légendaire
+     * (is_legendary = 1 dans pokemonLight.csv), sinon un Pokémon commun
+     * @returns {number} - Numéro de Pokémon entre 1 et game.numberOfPokemon
+     */
+    tirerNumPkmAleatoire() {
+        const legendaryChance = this.config.spawn.pokemonRarity?.legendary ?? 0.01;
+        const { communs, legendaires } = parsingIdsPkmParRarete(this.config.game.numberOfPokemon);
+        let pool = communs;
+        if (legendaires.length > 0 && Math.random() < legendaryChance) {
+            pool = legendaires;
+        }
+        if (pool.length === 0) {
+            return Math.floor(Math.random() * this.config.game.numberOfPokemon) + 1;
+        }
+        return pool[Math.floor(Math.random() * pool.length)];
     }
 
     /**

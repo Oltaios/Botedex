@@ -257,3 +257,37 @@ test('MaitreBall : saisie insensible à la casse, capture via la config', async 
     assert.deepEqual(await bddService.getBallsForUser('gc12', 'uc12'), stocks({}), 'MaitreBall décomptée');
     assert.equal(getNumPkmAvailable(), null, 'spawn consommé');
 });
+
+test('ball typée : rateEfficace (2) si le Pokémon a un type de la ball, sinon rate de base ; les balls classiques gardent leur rate', async () => {
+    // Bulbizarre n°1 : plante/poison, capture_rate 45
+    const msg = () => fakeMessage({ authorId: 'u-type', guildId: 'gc-type', channel: client.channels.cache.get(CHANNEL_ID), content: '!capture' });
+
+    // Monsanto Ball (plante/insecte) contre Bulbizarre (plante) -> rate 2
+    // seuil = 100 - (45*2)/3 = 70 ; succès si rng*2 >= 70, soit rng >= 35
+    let r = fixerRandom(0.5); // rng = 50 -> 100 >= 70
+    try {
+        assert.equal(await captureService.capture('u-type', '45', 'monsantoball', 'Bulbizarre', 1, msg()), true, 'bon type : rate 2, succès');
+    } finally { r(); }
+    r = fixerRandom(0.2); // rng = 20 -> 40 < 70
+    try {
+        assert.equal(await captureService.capture('u-type', '45', 'monsantoball', 'Bulbizarre', 1, msg()), false, 'bon type : rate 2, rng trop faible');
+    } finally { r(); }
+
+    // Dry Ball (eau) contre Bulbizarre (plante/poison) -> rate 1
+    // seuil = 100 - 45/3 = 85 ; succès si rng >= 85
+    r = fixerRandom(0.5); // rng = 50 -> 50 < 85
+    try {
+        assert.equal(await captureService.capture('u-type', '45', 'dryball', 'Bulbizarre', 1, msg()), false, 'mauvais type : rate 1, échec');
+    } finally { r(); }
+    r = fixerRandom(0.9); // rng = 90 -> 90 >= 85
+    try {
+        assert.equal(await captureService.capture('u-type', '45', 'dryball', 'Bulbizarre', 1, msg()), true, 'mauvais type : rate 1, succès au rng élevé');
+    } finally { r(); }
+
+    // Hyperball (pas de typesEfficaces) : rate 1.9 en permanence
+    // seuil = 100 - (45*1.9)/3 = 71.5 ; succès si rng >= 38 (à rate 1 le seuil serait 85 : rng 40 échouerait)
+    r = fixerRandom(0.4); // rng = 40 -> 76 >= 71.5
+    try {
+        assert.equal(await captureService.capture('u-type', '45', 'hyperball', 'Bulbizarre', 1, msg()), true, 'hyperball garde son rate 1.9 quel que soit le type');
+    } finally { r(); }
+});

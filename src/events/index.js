@@ -9,6 +9,7 @@
  */
 
 import * as messageCreate from './messageCreate.js';
+import * as messageReactionAdd from './messageReactionAdd.js';
 
 /**
  * Enregistre tous les événements sur un client Discord
@@ -17,6 +18,9 @@ import * as messageCreate from './messageCreate.js';
 export function registerAllEvents(client) {
     // Événement 'messageCreate' (à chaque nouveau message)
     client.on('messageCreate', messageCreate.handle);
+
+    // Événement 'messageReactionAdd' (réactions aux messages, ex. quiz capacités)
+    client.on('messageReactionAdd', messageReactionAdd.handle);
 
     // TODO: Ajouter d'autres événements si nécessaire
     // Exemple: client.on('interactionCreate', interactionCreate.handle);

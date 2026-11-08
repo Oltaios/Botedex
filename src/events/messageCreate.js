@@ -11,6 +11,7 @@ import { client, pendingResponses } from '../core/client.js';
 import { bddService } from '../services/bdd/BDDService.js';
 import * as commands from '../commands/index.js';
 import { channelService } from '../services/channel/ChannelService.js';
+import { dailyEventService } from '../services/event/DailyEventService.js';
 
 /**
  * Gère l'événement 'messageCreate' de Discord : routeur principal des commandes
@@ -85,6 +86,9 @@ export async function handle(message) {
             return;
         }
         
+        // Event quotidien : toute commande d'un dresseur enregistré le marque actif (fenêtre 24h)
+        await dailyEventService.touchActivity(message.guildId, message.author.id);
+
         // Route vers les commandes spécifiques
         try {
             // !game : accepte un type de jeu en argument ("!game type") ou rien
@@ -124,6 +128,9 @@ export async function handle(message) {
                     break;
                 case '!pokedex':
                     await commands.pokedex.execute(message);
+                    break;
+                case '!event':
+                    await commands.event.execute(message);
                     break;
                 case '!casino':
                     await commands.casino.execute(message, pendingResponses);

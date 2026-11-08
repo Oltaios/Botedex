@@ -162,7 +162,7 @@ test('recordGamePlayed/getGameLastPlayedAt : isolation par serveur et par jeu', 
         'date de jeu enregistrée'
     );
     assert.equal(await bddService.getGameLastPlayedAt('g11', 'u10', 'type'), null, 'autre guild non touchée');
-    assert.equal(await bddService.getGameLastPlayedAt('g10', 'u10', 'weight'), null, 'jeton indépendant par jeu');
+    assert.equal(await bddService.getGameLastPlayedAt('g10', 'u10', 'poids'), null, 'jeton indépendant par jeu');
 });
 
 test('resetIsWorking(null) : toutes les guilds (comportement mono-serveur)', async () => {
@@ -352,7 +352,8 @@ test('œuf : obtention unique, progression atomique, éclosion au seuil', async 
     assert.equal(etatFinal.eggActive, 0);
     assert.equal(etatFinal.eggCaptures, 0);
     const doc = await bddService.getDresseur('ge1', 'ue1');
-    assert.equal(doc[42], 1, 'Pokémon de l\'œuf ajouté au Pokédex');
+    assert.equal(await bddService.alreadyCaptured('ge1', 'ue1', 42), true, 'Pokémon de l\'œuf ajouté au Pokédex (bit dexBits)');
+    assert.equal(doc.dexCount, 1, 'compteur de distincts incrémenté');
     assert.equal(doc.nbrCapture, 0, 'l\'éclosion ne compte pas comme une capture');
     assert.equal(doc.oeufsEclos, 1, 'compteur d\'œufs éclos incrémenté (la tentative refusée sous le seuil ne compte pas)');
 

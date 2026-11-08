@@ -23,6 +23,49 @@
       "rate": 100,
       "price": 2000,
       "feesMultiplier": 1
+    },
+    "monsantoball": {
+      "nom": "Monsanto Ball",
+      "rate": 1,
+      "rateEfficace": 2,
+      "typesEfficaces": [
+        "plante",
+        "insecte"
+      ],
+      "price": 100,
+      "feesMultiplier": 1
+    },
+    "tisanerieball": {
+      "nom": "Tisanerie Ball",
+      "rate": 1,
+      "rateEfficace": 2,
+      "typesEfficaces": [
+        "feu",
+        "sol"
+      ],
+      "price": 100,
+      "feesMultiplier": 1
+    },
+    "foretball": {
+      "nom": "Foret Ball",
+      "rate": 1,
+      "rateEfficace": 2,
+      "typesEfficaces": [
+        "roche",
+        "acier"
+      ],
+      "price": 100,
+      "feesMultiplier": 1
+    },
+    "dryball": {
+      "nom": "Dry Ball",
+      "rate": 1,
+      "rateEfficace": 2,
+      "typesEfficaces": [
+        "eau"
+      ],
+      "price": 100,
+      "feesMultiplier": 1
     }
   },
   "economy": {
@@ -34,7 +77,7 @@
     "adminUserIds": ""
   },
   "game": {
-    "numberOfPokemon": 151,
+    "numberOfPokemon": 251,
     "chooseGameTimeMs": 15000,
     "guessMyTypeTimeMs": 30000,
     "guessMyTypeMaxAttempts": 3,
@@ -43,7 +86,14 @@
     "guessMyWeightMaxAttempts": 3,
     "guessMyWeightTolerance": 0.1,
     "guessMyWeightReward": 80,
-    "guessMyNameReward": 50
+    "guessMyNameTimeMs": 30000,
+    "guessMyNameMaxErrors": 2,
+    "guessMyNameReward": 50,
+    "guessMyAbilityTimeMs": 30000,
+    "guessMyAbilityReward": 30
+  },
+  "egg": {
+    "capturesRequises": 10
   },
   "egg": {
     "capturesRequises": 10
@@ -53,9 +103,21 @@
     "maxBet": 500,
     "responseTimeMs": 15000,
     "payouts": [
-      { "chance": 0.01, "multiplier": 5, "label": "Lot Miaouss" },
-      { "chance": 0.07, "multiplier": 1.5, "label": "Lot Persian" },
-      { "chance": 0.14, "multiplier": 1, "label": "Lot indemne" }
+      {
+        "chance": 0.01,
+        "multiplier": 5,
+        "label": "Lot Miaouss"
+      },
+      {
+        "chance": 0.07,
+        "multiplier": 1.5,
+        "label": "Lot Persian"
+      },
+      {
+        "chance": 0.14,
+        "multiplier": 1,
+        "label": "Lot indemne"
+      }
     ]
   },
   "spawn": {
@@ -64,10 +126,22 @@
     "pokemonRarity": {
       "common": 0.7,
       "rare": 0.25,
-      "legendary": 0.05
+      "legendary": 0.01
     }
   },
+  "dailyEvent": {
+    "enabled": true,
+    "resetHour": 2,
+    "pointsPerActivePlayer": 100,
+    "points": {
+      "game": 5,
+      "capture": 10,
+      "work": 5
+    },
+    "rewardAmount": 200
+  },
   "release": {
-    "notes": "📝 Patch note\n\n✨ Features : \n- Nouvelle feature Œuf : !egg obtenir pour que le Professeur Chen te confie un œuf (un seul en incubation à la fois). !egg pour suivre son état, l'estimation reste floue... Chaque capture réussie fait progresser l'œuf, à l'éclosion un Pokémon aléatoire rejoint ton Pokédex, annoncé pendant la capture !\n- Commande !classement : le top 10 des dresseurs du serveur, trois façons de briller\n   - !classement (ou !classement pokedex) : nombre de Pokémon différents capturés\n   - !classement captures : nombre de captures effectuées, doublons inclus\n   - !classement egg : nombre d'œufs éclos, le vrai trophée de patience\n\n🐛 Corrections :\n- Correction du fichier source des noms et types de Pokémon (Nom pour GIF Nidoran♀/♂, types de Miaouss, Persian et Ossatueur...)"
+    "notesFile": "PATCHNOTE.md",
+    "notes": "📝 Patch note indisponible — voir PATCHNOTE.md à la racine du projet."
   }
 }

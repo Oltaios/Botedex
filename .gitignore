@@ -107,3 +107,6 @@ dist
 backups/
 scripts/backup-collection.mjs
 scripts/migrate-composite-id.mjs
+
+# Scripts ops locaux (backup/migration/rollback, cf. modop)
+scripts/

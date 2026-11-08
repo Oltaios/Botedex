@@ -12,45 +12,46 @@
  *   3. Compression deflate (RFC 1950, comme CompressionStream('deflate'))
  *   4. Hash final : "#s=" + base64url sans padding du contenu compressé
  *
- * Jeu ciblé : "rby" (Red/Blue/Yellow dans la config de l'app), dex Kanto de
- * 151 slots. Les slots correspondent aux numéros du Pokédex national de la
- * génération 1, c'est-à-dire aux clés '1' à '151' du document dresseur.
+ * Jeu ciblé : "gsc" (Gold/Silver/Crystal dans la config de l'app), dex Johto
+ * de 251 slots (game.numberOfPokemon : générations 1+2). Les slots
+ * correspondent aux numéros du Pokédex national, c'est-à-dire aux clés
+ * '1' à 'numberOfPokemon' du document dresseur.
  * À toute évolution du format côté app (version du schéma), il faudra
  * répercuter les constantes ici.
  */
 
 import { deflateSync } from 'node:zlib';
 
+import { getConfig } from './configLoader.js';
+import { decodeDexBits, encodeDexBits, bitsDepuisLegacy } from './dexBits.js';
+
 const SITE_LIVINGDEX = 'https://livingdex.app';
-const GAME_ID = 'rby';
-const SEGMENTS = ['kanto'];
+const GAME_ID = 'gsc';
+const SEGMENTS = ['johto'];
 const SHARE_PAYLOAD_VERSION = 2;
-const NB_PKM_GEN1 = 151;
+const NB_PKM_DEX = getConfig().game.numberOfPokemon;
 
 /**
  * Construit le lien LivingDex de la checklist d'un dresseur
- * @param {Object|null} dresseur - Document MongoDB du dresseur (champs
- *        '1'-'151' à 0 ou 1), ou null pour une checklist vide
+ * @param {Object|null} dresseur - Document MongoDB du dresseur (champ dexBits
+ *        base64url, ou anciens champs '1'..numberOfPokemon en repli), ou null
  * @returns {string} - URL complète du type
- *          https://livingdex.app/?game=rby#s=<base64url>
+ *          https://livingdex.app/?game=gsc#s=<base64url>
  */
 export function construireLienDex(dresseur) {
-    // 1. Bit-pack des captures (LSB-first, comme l'app)
-    const octets = Buffer.alloc(Math.ceil(NB_PKM_GEN1 / 8));
-    for (let slot = 1; slot <= NB_PKM_GEN1; slot++) {
-        if (dresseur?.[slot] === 1) {
-            const i = slot - 1;
-            octets[i >> 3] |= 1 << (i & 7);
-        }
-    }
+    // 1. Bitset des captures (LSB-first, comme l'app) : champ dexBits si
+    //    présent (même encodage), sinon repli depuis les anciens champs numériques
+    const bitsB64 = dresseur?.dexBits !== undefined && dresseur?.dexBits !== null
+        ? encodeDexBits(decodeDexBits(dresseur.dexBits, NB_PKM_DEX))
+        : encodeDexBits(bitsDepuisLegacy(dresseur, NB_PKM_DEX));
 
     // 2. Payload JSON au schéma de partage de l'app
     const payload = JSON.stringify({
         version: SHARE_PAYLOAD_VERSION,
         gameId: GAME_ID,
         segments: SEGMENTS,
-        slotCount: NB_PKM_GEN1,
-        bits: octets.toString('base64url')
+        slotCount: NB_PKM_DEX,
+        bits: bitsB64
     });
 
     // 3. Compression deflate puis 4. hash #s= en base64url
